@@ -1,266 +1,67 @@
-# Project Introduction
+# Production-Grade GitOps-Driven Microservices
 
-# Intro to Online Boutique App
+A hands-on, end-to-end GitOps project that deploys the **Online Boutique** microservices demo on **AWS EKS**, using Terraform for infrastructure, GitHub Actions for CI, Argo CD for CD, Argo CD Image Updater for automated image rollouts, and a full observability stack (Prometheus, Grafana, Alertmanager, Elasticsearch, Filebeat, Kibana) with autoscaling (HPA).
 
-This is a type of e-commerce platform, but unlike Amazon-type stores, it focuses on:
+Repository: [keshavp07-git/Production-Grade-GitOps-Driven-Microservices](https://github.com/keshavp07-git/Production-Grade-GitOps-Driven-Microservices)
 
-- **Niche or curated products**
-- **Unique / limited collections**
-- **Strong brand identity & style**
+---
 
-Think of it as a **digital version of a small, stylish fashion store**.
+## Table of Contents
 
-But from a **technical perspective**, modern boutique apps are **not built as a single application**.
+1. [About the Application](#about-the-application)
+2. [Architecture](#architecture)
+3. [Implementation](#implementation)
+   - [Provision infrastructure with Terraform](#1-provision-infrastructure-with-terraform)
+   - [Bastion host configuration](#2-bastion-host-configuration)
+   - [AWS Load Balancer Controller](#3-aws-load-balancer-controller)
+   - [Gateway API](#4-gateway-api)
+   - [External DNS](#5-external-dns)
+   - [Argo CD](#6-argo-cd)
+   - [CI with GitHub Actions](#7-ci-with-github-actions)
+   - [CD with Argo CD](#8-cd-with-argo-cd)
+   - [Argo CD Image Updater (CI + CD integration)](#9-argo-cd-image-updater-ci--cd-integration)
+4. [Observability](#observability)
+5. [Scaling & Reliability](#scaling--reliability)
+6. [Cleanup](#cleanup)
+7. [FAQs](#faqs)
 
-They are built using **Microservices Architecture**.
+---
 
-> [!TIP]
-># What is Microservices?
->
->**Microservices** is an architectural style where an application is broken into **small, independent services**, and each service:
->
->- Handles a **specific business function**
->- Runs independently
->- Communicates via APIs
->
->👉 Instead of one big application (monolith), you have **multiple small services working together**.
->
->---
->
-># Online Boutique = Microservices in Action
->
->This online boutique app is made up of multiple services like:
->
->### 🧾 Product Catalog Service
->
->- Manages product list, categories, pricing
->
->### 🛒 Cart Service
->
->- Handles user cart (add/remove items)
->
->### 💳 Payment Service
->
->- Processes payments (UPI, cards)
->
->### 📦 Order Service
->
->- Manages order lifecycle
->
->### 👤 Frontend Service
->
->- Authentication & profiles
->
->### 🚚 Shipping Service
->
->- Delivery tracking & logistics
->
->### Etc..
->
->---
->
-># How These Services Communicate
->
->- REST APIs (HTTP)
->- gRPC (faster internal communication)
->- Message queues (Kafka / RabbitMQ)
->
->👉 Example:
->
->- Cart service → calls Product service
->- Order service → calls Payment service
->
->---
->
-># Monolith vs Microservices
->
->### Monolithic App ❌
->
->- Everything in one codebase
->- Hard to scale
->- Single failure affects whole system
->
->### Microservices App ✅
->
->- Independent services
->- Easy to scale
->- Fault isolation
->
->👉 That’s why modern apps (like boutique apps) >use microservices.
+## About the Application
 
-
-# **Architecture**
-
-**Online Boutique** is composed of 11 microservices written in different languages that talk to each other over gRPC.
-
-![image.png](docs/images/Architecture01.png)
+Online Boutique is a cloud-native e-commerce demo built as a **microservices architecture**: 11 independent services, written in different languages, communicating over **gRPC**. Each service handles one business function, runs independently and can be scaled and deployed on its own.
 
 | **Service** | **Language** | **Description** |
 | --- | --- | --- |
-| [frontend](https://github.com/laxmikantagiri/Production-Grade_GitOps-Driven_Microservices-Demo/blob/main/src/frontend) | Go | Exposes an HTTP server to serve the website. Does not require signup/login and generates session IDs for all users automatically. |
-| [cartservice](https://github.com/laxmikantagiri/Production-Grade_GitOps-Driven_Microservices-Demo/blob/main/src/cartservice) | C# | Stores the items in the user's shopping cart in Redis and retrieves it. |
-| [productcatalogservice](https://github.com/laxmikantagiri/Production-Grade_GitOps-Driven_Microservices-Demo/blob/main/src/productcatalogservice) | Go | Provides the list of products from a JSON file and ability to search products and get individual products. |
-| [currencyservice](https://github.com/laxmikantagiri/Production-Grade_GitOps-Driven_Microservices-Demo/blob/main/src/currencyservice) | Node.js | Converts one money amount to another currency. Uses real values fetched from European Central Bank. It's the highest QPS service. |
-| [paymentservice](https://github.com/laxmikantagiri/Production-Grade_GitOps-Driven_Microservices-Demo/blob/main/src/paymentservice) | Node.js | Charges the given credit card info (mock) with the given amount and returns a transaction ID. |
-| [shippingservice](https://github.com/laxmikantagiri/Production-Grade_GitOps-Driven_Microservices-Demo/blob/main/src/shippingservice) | Go | Gives shipping cost estimates based on the shopping cart. Ships items to the given address (mock) |
-| [emailservice](https://github.com/laxmikantagiri/Production-Grade_GitOps-Driven_Microservices-Demo/blob/main/src/emailservice) | Python | Sends users an order confirmation email (mock). |
-| [checkoutservice](https://github.com/laxmikantagiri/Production-Grade_GitOps-Driven_Microservices-Demo/blob/main/src/checkoutservice) | Go | Retrieves user cart, prepares order and orchestrates the payment, shipping and the email notification. |
-| [recommendationservice](https://github.com/laxmikantagiri/Production-Grade_GitOps-Driven_Microservices-Demo/blob/main/src/recommendationservice) | Python | Recommends other products based on what's given in the cart. |
-| [adservice](https://github.com/laxmikantagiri/Production-Grade_GitOps-Driven_Microservices-Demo/blob/main/src/adservice) | Java | Provides text ads based on given context words. |
-| [loadgenerator](https://github.com/laxmikantagiri/Production-Grade_GitOps-Driven_Microservices-Demo/blob/main/src/loadgenerator) | Python/Locust | Continuously sends requests imitating realistic user shopping flows to the frontend. |
+| frontend | Go | Exposes an HTTP server to serve the website. Does not require signup/login and generates session IDs for all users automatically. |
+| cartservice | C# | Stores the items in the user's shopping cart in Redis and retrieves it. |
+| productcatalogservice | Go | Provides the list of products from a JSON file and ability to search products and get individual products. |
+| currencyservice | Node.js | Converts one money amount to another currency. Uses real values fetched from the European Central Bank. It's the highest QPS service. |
+| paymentservice | Node.js | Charges the given credit card info (mock) with the given amount and returns a transaction ID. |
+| shippingservice | Go | Gives shipping cost estimates based on the shopping cart. Ships items to the given address (mock). |
+| emailservice | Python | Sends users an order confirmation email (mock). |
+| checkoutservice | Go | Retrieves user cart, prepares order and orchestrates the payment, shipping and the email notification. |
+| recommendationservice | Python | Recommends other products based on what's given in the cart. |
+| adservice | Java | Provides text ads based on given context words. |
+| loadgenerator | Python/Locust | Continuously sends requests imitating realistic user shopping flows to the frontend. |
 
-Screenshots:
+Screenshot of the application:
 
 ![image.png](docs/images/Screenshot01.png)
 
----
+### Data & persistence
 
-**Most services are stateless**, and **only the cart uses persistence (Redis)**. Let’s break it down cleanly.
-
-# How data works in `microservices-demo`
-
-This project is **designed** to:
-
-- Demonstrate **microservice communication**
-- Be **easy to deploy anywhere**
-- Avoid complex database ops
-
-So it uses **minimal persistence** on purpose.
-
----
-
-## Service-by-Service Data Breakdown
-
-### ✅ **cartservice** → ✔️ HAS persistence
-
-**Storage used:**
-
-- **Redis**
-
-**What’s stored:**
-
-- User cart items
-- Quantity, product IDs
-
-**Why Redis?**
-
-- Fast
-- Simple
-- Easy to reset
-- No schema complexity
-
-📌 In Kubernetes:
-
-- Redis runs as a pod (or StatefulSet)
-- Cart data is lost if Redis is deleted (by default)
-
----
-
-### ❌ **orders / checkout** → NO real database
-
-There is **NO dedicated “orders database”**.
-
-**checkoutservice:**
-
-- Aggregates data from:
-    - cartservice
-    - paymentservice
-    - shippingservice
-    - emailservice
-- Simulates order placement
-- Does **not persist orders**
-
-👉 This is **by design**, to keep the demo lightweight.
-
----
-
-### ❌ **productcatalogservice**
-
-**Storage:**
-
-- Static JSON file
-- Loaded into memory at startup
-
-**No DB**
-
-- Products reset on restart
-
----
-
-### ❌ **recommendationservice**
-
-**Storage:**
-
-- Stateless
-- Generates recommendations dynamically
-
----
-
-### ❌ **paymentservice**
-
-**Storage:**
-
-- None
-- Fake payment processor
-
----
-
-### ❌ **shippingservice**
-
-**Storage:**
-
-- None
-- Simulated shipping cost logic
-
----
-
-### ❌ **emailservice**
-
-**Storage:**
-
-- None
-- Just logs “email sent”
-
----
-
-### ❌ **adservice**
-
-**Storage:**
-
-- In-memory ad data
-- No persistence
-
----
-
-### ❌ **frontend**
-
-**Storage:**
-
-- Stateless
-- Just UI + API calls
-
----
-
-### ❌ **currencyservice**
-
-**Storage:**
-
-- Static exchange rates
-- In-memory only
-
----
-
-## SUMMARY TABLE
+Most services are **stateless**; only the cart uses persistence (Redis). This is intentional, to keep the demo lightweight and focus on platform concerns like CI/CD, observability, scaling and networking.
 
 | Service | Persistent Storage | Type |
 | --- | --- | --- |
 | cartservice | ✅ Yes | Redis |
-| checkoutservice | ❌ No | Stateless |
+| checkoutservice | ❌ No | Stateless (orders are not persisted) |
 | productcatalogservice | ❌ No | In-memory JSON |
 | recommendationservice | ❌ No | Stateless |
-| paymentservice | ❌ No | Fake |
-| shippingservice | ❌ No | Fake |
-| emailservice | ❌ No | Fake |
+| paymentservice | ❌ No | Mock |
+| shippingservice | ❌ No | Mock |
+| emailservice | ❌ No | Mock |
 | adservice | ❌ No | In-memory |
 | frontend | ❌ No | Stateless |
 | currencyservice | ❌ No | In-memory |
@@ -268,80 +69,68 @@ There is **NO dedicated “orders database”**.
 
 ---
 
-> “The demo intentionally keeps most services stateless to simplify deployment and focus on platform concerns like CI/CD, observability, scaling, and networking.”
-> 
+## Architecture
 
----
+![image.png](docs/images/Architecture01.png)
 
-# Project Architecture
+### Project (GitOps) Architecture
 
 ![Gitops Project.gif](docs/images/Gitops_Project.gif)
 
 ![Gitops Project.drawio.png](docs/images/Gitops_Project.png)
----
----
----
----
-# Implementation
 
-## Install tools in Local Machine
+---
+
+## Implementation
+
+### Prerequisites
+
+Install on your local machine:
 
 - AWS CLI
-- Terraform in your local machine
-- Create an IAM user and create access key and secret access key for the user and do `aws configure`
+- Terraform
+- An IAM user with an access key and secret access key, configured with `aws configure`
 
-Clone the repo:
+### 1. Provision infrastructure with Terraform
 
-```bash
-https://github.com/laxmikantagiri/Production-Grade_GitOps-Driven_Microservices-Demo.git
-```
-
-chnage directory to terraform:
+Clone the repo and move to the `terraform` directory:
 
 ```bash
-cd Production-Grade_GitOps-Driven_Microservices-Demo/terraform/
+git clone https://github.com/keshavp07-git/Production-Grade-GitOps-Driven-Microservices.git
+cd Production-Grade-GitOps-Driven-Microservices/terraform/
 ```
 
-## Terraform Run
-
-Clone te repo , `cd` to `terraform` directory. Do
+Initialize, review the plan, and apply:
 
 ```bash
 terraform init
-Terraform plan 
-```
-
-Verify the resources and then do
-
-```bash
+terraform plan
 terraform apply
 ```
 
-After apply you should see the bastion host’s public IP as outputs.
+After apply you will see the bastion host's public IP as an output. The instance's private key is also created in the current directory.
 
-At the current directory you would see the instance’s private key as well
+#### (Optional) Terraform remote backend on S3
 
-## Set up Terraform Remote Backend (Optional)
-
-Create a bucket using Console or AWS CLI.
+Create a bucket (replace the name with a globally unique one):
 
 ```bash
 aws s3api create-bucket \
-  --bucket devopsdock-terraform-backend-bucket \
+  --bucket <your-terraform-backend-bucket> \
   --region us-east-1
 ```
 
-Enable versioning and bucket encryption:
+Enable versioning and encryption:
 
 ```bash
 # Enable versioning
 aws s3api put-bucket-versioning \
-  --bucket devopsdock-terraform-backend-bucket \
+  --bucket <your-terraform-backend-bucket> \
   --versioning-configuration Status=Enabled
 
 # Enable encryption
 aws s3api put-bucket-encryption \
-  --bucket devopsdock-terraform-backend-bucket \
+  --bucket <your-terraform-backend-bucket> \
   --server-side-encryption-configuration '{
     "Rules":[{
       "ApplyServerSideEncryptionByDefault":{
@@ -349,94 +138,71 @@ aws s3api put-bucket-encryption \
       }
     }]
   }'
-
 ```
 
-Add this below backend block in `terraform.tf` file
+Add this backend block in `terraform.tf`:
 
-```bash
+```hcl
 terraform {
   backend "s3" {
-    bucket = "devopsdock-terraform-backend-bucket"
+    bucket = "<your-terraform-backend-bucket>"
     key    = "s3-backend"
     region = "us-east-1"
   }
 }
 ```
 
-Run `terraform init` to initialize it again.
-
-As we already have the tfstate file locally you would see something similar , i.e move your state to backend.
-
-Example Output:
+Run `terraform init` again. Since a local state file already exists, Terraform will ask whether to copy it to the new backend:
 
 ```bash
- Initializing the backend...
+Initializing the backend...
 Do you want to copy existing state to the new backend?
-  Pre-existing state was found while migrating the previous "local" backend to the
-  newly configured "s3" backend. No existing state was found in the newly
-  configured "s3" backend. Do you want to copy this state to the new "s3"
-  backend? Enter "yes" to copy and "no" to start with an empty state.
-
-  Enter a value: 
+  ...
+  Enter a value:
 ```
 
-Type “Yes”, The backend will move to s3.
+Type `yes`; the state moves to S3 and is read from there from now on.
 
-Now the state will be reading from s3 backend.
+### 2. Bastion host configuration
 
-## Bastion Host Configuration
-
-SSH to the Bastion host from the same terraform directory as it creates the private key in the same directory.
+SSH to the bastion host from the same terraform directory (where the private key was created):
 
 ```bash
 ssh -i bastion-key.pem ubuntu@<publicIP>
 ```
 
-Now install the below tools  in the Bastion Host:
+Install the following tools on the bastion host:
 
-- AWS CLI
-- kubectl client
-- HELM
-- eksctl
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+- [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/#install-using-native-package-management)
+- [Helm](https://helm.sh/docs/intro/install/)
+- [eksctl](https://docs.aws.amazon.com/eks/latest/eksctl/installation.html)
 
-**Installation Resource Docs**
-
-- [https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
-- [https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/#install-using-native-package-management](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/#install-using-native-package-management)
-- [https://helm.sh/docs/intro/install/](https://helm.sh/docs/intro/install/)
-- [https://docs.aws.amazon.com/eks/latest/eksctl/installation.html](https://docs.aws.amazon.com/eks/latest/eksctl/installation.html)
-
-Do `aws configure` and set up with the access and secret access keys , You can use the same access and secret access key which you set it up in the local.
-
-Then, import the kubeconfig file by putting the below command.
+Run `aws configure` with the same access keys used locally, then import the kubeconfig:
 
 ```bash
-aws eks update-kubeconfig --region <your-region> --name <your-cluster-name> 
+aws eks update-kubeconfig --region <your-region> --name <your-cluster-name>
 ```
 
-After added the context check:
+Verify:
 
 ```bash
 kubectl get nodes
 ```
 
-Expected Output:
+Expected output:
 
 ```bash
-kubectl get nodes
 NAME                         STATUS   ROLES    AGE    VERSION
 ip-10-0-1-248.ec2.internal   Ready    <none>   100m   v1.33.5-eks-ecaa3a6
 ip-10-0-2-138.ec2.internal   Ready    <none>   100m   v1.33.5-eks-ecaa3a6
 ```
 
-## Install **AWS Load Balancer Controller**
+### 3. AWS Load Balancer Controller
 
-Docs: [https://docs.aws.amazon.com/eks/latest/userguide/lbc-helm.html](https://docs.aws.amazon.com/eks/latest/userguide/lbc-helm.html)
+Docs: [Helm install guide](https://docs.aws.amazon.com/eks/latest/userguide/lbc-helm.html) · [Controller installation](https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/deploy/installation/)
 
-[https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/deploy/installation/](https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/deploy/installation/)
-
-Create an IAM OIDC provider. You can skip this step if you already have one for your cluster. In our case this is done at the terraform level.
+**IAM OIDC provider** (already created at the Terraform level in this project; skip if you have one):
 
 ```bash
 eksctl utils associate-iam-oidc-provider \
@@ -445,24 +211,24 @@ eksctl utils associate-iam-oidc-provider \
     --approve
 ```
 
-**Create IAM role using `eksctl`.**
+**Create the IAM policy and service account:**
 
-1. Download an IAM policy for the AWS Load Balancer Controller that allows it to make calls to AWS APIs on your behalf.
-    
+1. Download the IAM policy for the controller:
+
     ```bash
     curl -O https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.14.1/docs/install/iam_policy.json
     ```
-    
-2. Create an IAM policy using the policy downloaded in the previous step.
-    
+
+2. Create the IAM policy:
+
     ```bash
     aws iam create-policy \
         --policy-name AWSLoadBalancerControllerIAMPolicy \
         --policy-document file://iam_policy.json
     ```
-    
-3. Replace the values for cluster name, region code, and account ID.
-    
+
+3. Create the service account (replace cluster name, region and account ID):
+
     ```bash
     eksctl create iamserviceaccount \
         --cluster=<cluster-name> \
@@ -473,93 +239,56 @@ eksctl utils associate-iam-oidc-provider \
         --region <aws-region-code> \
         --approve
     ```
-    
 
-**Install AWS Load Balancer Controller**
-
-1. Add the `eks-charts` Helm chart repository. AWS maintains [this repository](https://github.com/aws/eks-charts) on GitHub.
-    
-    ```bash
-    helm repo add eks https://aws.github.io/eks-charts
-    ```
-    
-2. Update your local repo to make sure that you have the most recent charts.
-    
-    ```bash
-    helm repo update eks
-    ```
-    
-3. Install the AWS Load Balancer Controller.
-    - `-set region=region-code`
-    - `-set vpcId=vpc-xxxxxxxx`
-        
-        Replace `*my-cluster*` with the name of your cluster. In the following command, `aws-load-balancer-controller` is the Kubernetes service account that you created in a previous step.
-        
-        ```bash
-        helm upgrade -i aws-load-balancer-controller eks/aws-load-balancer-controller \
-          -n kube-system \
-          --set clusterName=test-terraform-cluster \
-          --set region=us-east-1 \
-          --set vpcId=vpc-045ed20a9ec483107 \
-          --set serviceAccount.create=false \
-          --set serviceAccount.name=aws-load-balancer-controller \
-          --set controllerConfig.featureGates.NLBGatewayAPI=true \
-          --set controllerConfig.featureGates.ALBGatewayAPI=true \
-          --version 3.0.0
-        ```
-        
-
-**Verify that the controller is installed**
-
-1. Verify that the controller is installed.
-    
-    ```bash
-    kubectl get deployment -n kube-system aws-load-balancer-controller
-    ```
-    
-    An example output is as follows.
-    
-    ```bash
-    NAME                           READY   UP-TO-DATE   AVAILABLE   AGE
-    aws-load-balancer-controller   2/2     2            2           84s
-    ```
-    
-
-## Gateway API
-
-Docs: [https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/gateway/l7gateway/](https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/gateway/l7gateway/)
-
-Installation of Gateway API CRDs
-
-- Standard Gateway API CRDs:  [REQUIRED]
-    
-    ```bash
-    kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
-    ```
-    
-- Experimental Gateway API CRDs:  [OPTIONAL: Used for L4 Routes]
-    
-    ```bash
-    kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/experimental-install.yaml
-    ```
-    
-- Installation of LBC Gateway API specific CRDs:
-    
-    ```bash
-    kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/refs/heads/main/config/crd/gateway/gateway-crds.yaml
-    ```
-    
-
-> [!NOTE]
->
->All the configs are already availbale in their respective directories, We can use them or copy from this guide and configure on your own.
-
-Create a gateway class:
-
-`gateway-class.yaml`
+**Install the controller:**
 
 ```bash
-# alb-gatewayclass.yaml
+helm repo add eks https://aws.github.io/eks-charts
+helm repo update eks
+
+helm upgrade -i aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName=<your-cluster-name> \
+  --set region=us-east-1 \
+  --set vpcId=<your-vpc-id> \
+  --set serviceAccount.create=false \
+  --set serviceAccount.name=aws-load-balancer-controller \
+  --set controllerConfig.featureGates.NLBGatewayAPI=true \
+  --set controllerConfig.featureGates.ALBGatewayAPI=true \
+  --version 3.0.0
+```
+
+Verify:
+
+```bash
+kubectl get deployment -n kube-system aws-load-balancer-controller
+
+NAME                           READY   UP-TO-DATE   AVAILABLE   AGE
+aws-load-balancer-controller   2/2     2            2           84s
+```
+
+### 4. Gateway API
+
+Docs: [AWS LBC – L7 Gateway](https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/gateway/l7gateway/)
+
+Install the CRDs:
+
+```bash
+# Standard Gateway API CRDs [REQUIRED]
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
+
+# Experimental Gateway API CRDs [OPTIONAL: used for L4 routes]
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/experimental-install.yaml
+
+# AWS LBC Gateway API specific CRDs
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/refs/heads/main/config/crd/gateway/gateway-crds.yaml
+```
+
+> **Note:** All the configs are already available in their respective directories in this repo. Use them directly or copy from this guide.
+
+**GatewayClass** – `gateway-class.yaml`
+
+```yaml
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: GatewayClass
 metadata:
@@ -568,20 +297,13 @@ spec:
   controllerName: gateway.k8s.aws/alb
 ```
 
-apply the manifest:
-
 ```bash
 kubectl apply -f gateway-class.yaml
 ```
 
-Create the Load balancer configuration:
+**LoadBalancerConfiguration** – `alb-config.yaml` (specific to the AWS LBC; other Gateway API controllers don't need it)
 
-This is required for AWS LBC controller and might not be required for othe rgateway api controller.
-
-`alb-config.yaml`
-
-```bash
-# lbconfig.yaml
+```yaml
 apiVersion: gateway.k8s.aws/v1beta1
 kind: LoadBalancerConfiguration
 metadata:
@@ -594,18 +316,13 @@ spec:
       defaultCertificate: <certificate arn>
 ```
 
-Apply :
-
 ```bash
 kubectl apply -f alb-config.yaml
 ```
 
-**Create the gateway:**
+**Gateway** – `gateway.yaml`
 
-`gateway.yaml`
-
-```bash
-# my-alb-gateway.yaml
+```yaml
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: Gateway
 metadata:
@@ -622,46 +339,39 @@ spec:
   - name: http
     protocol: HTTP
     port: 80
-    hostname: "*.devopsdock.site"
+    hostname: "*.<your-domain>"
     allowedRoutes:
       namespaces:
         from: All
   - name: https
     protocol: HTTPS
-    hostname: "*.devopsdock.site"
+    hostname: "*.<your-domain>"
     port: 443
     allowedRoutes:
       namespaces:
         from: All
 ```
 
-Apply Gateway manifests:
-
 ```bash
 kubectl apply -f gateway.yaml
 ```
 
-Verify the gateway and the load balancer in the AWS UI.
+Verify the gateway and the load balancer in the AWS console:
 
 ```bash
 kubectl get gateway
 
 NAME              CLASS                   ADDRESS                                                                  PROGRAMMED   AGE
-app-alb-gateway   aws-alb-gateway-class   k8s-default-appalbga-65aa25bc91-1838810992.us-east-1.elb.amazonaws.com   Unknown      5s
+app-alb-gateway   aws-alb-gateway-class   k8s-default-appalbga-xxxxxxxxxx-xxxxxxxxxx.us-east-1.elb.amazonaws.com   Unknown      5s
 ```
 
-## **Deploying External DNS:**
+### 5. External DNS
 
-Docs: 
+Docs: [ExternalDNS on AWS (Pod Identity / OIDC)](https://github.com/kubernetes-sigs/external-dns/blob/master/docs/tutorials/aws.md#using-helm-with-oidc) · [ExternalDNS with Gateway API](https://kubernetes-sigs.github.io/external-dns/v0.13.1/tutorials/gateway-api/#manifest-with-rbac)
 
-- [https://github.com/kubernetes-sigs/external-dns/blob/master/docs/tutorials/aws.md#using-helm-with-oidc](https://github.com/kubernetes-sigs/external-dns/blob/master/docs/tutorials/aws.md#using-helm-with-oidc)
-- [https://kubernetes-sigs.github.io/external-dns/v0.13.1/tutorials/gateway-api/#manifest-with-rbac](https://kubernetes-sigs.github.io/external-dns/v0.13.1/tutorials/gateway-api/#manifest-with-rbac) (How to setup with GatewayAPI)
+Create `policy.json`:
 
-Create a file with below content for IAM policy:
-
-vi `policy.json`
-
-```bash
+```json
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -689,45 +399,28 @@ vi `policy.json`
 }
 ```
 
-Create policy from the policy document
+Create the policy:
 
 ```bash
 aws iam create-policy --policy-name "AllowExternalDNSUpdates" --policy-document file://policy.json
 
-# example: arn:aws:iam::XXXXXXXXXXXX:policy/AllowExternalDNSUpdates
 export POLICY_ARN=$(aws iam list-policies \
  --query 'Policies[?PolicyName==`AllowExternalDNSUpdates`].Arn' --output text)
- 
-export EKS_CLUSTER_NAME=test-terraform-cluster
+
+export EKS_CLUSTER_NAME=<your-cluster-name>
 ```
 
-## **We will use pod identity agent for the external dns setup:**
+**Using EKS Pod Identity.** The `eks-pod-identity-agent` add-on is created while provisioning the cluster (via Terraform), so this step can be skipped. To create it manually:
 
-We have created this addon while creating the cluster, so igonre this step.
-
-**Check Pod Identity Agent is enabled**
-
-This method requires the `Pod Identity Agent` installed on the cluster, hence the AWS EKS add-on `eks-pod-identity-agent`. Pod identity associations is running an agent as a daemonset on the worker nodes.
-
-It is also possible to create the add-on using `eksctl`
-
-```
+```bash
 eksctl create addon --cluster $EKS_CLUSTER_NAME --name eks-pod-identity-agent
 ```
 
-**Create an IAM role bound to a service account**
-
-**Use eksctl with eksctl created EKS cluster**
-
-If `eksctl` was used to provision the EKS cluster, you can perform all of these steps with the following command:
-
-Create a namespace:
+Create the namespace and the pod identity association:
 
 ```bash
 kubectl create ns external-dns
-```
 
-```bash
 eksctl create podidentityassociation \
   --cluster $EKS_CLUSTER_NAME \
   --namespace external-dns \
@@ -736,44 +429,26 @@ eksctl create podidentityassociation \
   --permission-policy-arns $POLICY_ARN
 ```
 
-**Deploy ExternalDNS using Pod Identity**
+Unlike IRSA, Pod Identity needs no service account annotations; the agent injects credentials at runtime.
 
-Unlike the IRSA method, Pod Identity requires no further steps, nor service account annotations, since the pod identity association will bind the service account to the given IAM role, hence to a policy holding the requested set of permissions. The EKS Pod Identity Agent handles credential injection at runtime.
-
-Add the Repo:
+Deploy ExternalDNS:
 
 ```bash
 helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
-```
-
-Deploy in a separte Namespace:
-
-```bash
 helm install external-dns external-dns/external-dns -n external-dns --version 1.20.0
-```
-
-Verify:
-
-```bash
 kubectl get pod -n external-dns
-```
 
-Output:
-
-```bash
 NAME                            READY   STATUS    RESTARTS   AGE
 external-dns-6f95d4687d-6tc2g   1/1     Running   0          94s
 ```
 
-Get the values file:
+Get the values file and add the Gateway API sources:
 
 ```bash
 helm show values external-dns/external-dns --version 1.20.0 > external-dns-values-1.20.0.yaml
 ```
 
-Edit the value:
-
-```bash
+```yaml
 sources:
   - service
   - ingress
@@ -783,79 +458,51 @@ sources:
   - gateway-udproute
 ```
 
-Upgrade the install:
-
 ```bash
 helm upgrade -i external-dns external-dns/external-dns -f external-dns-values-1.20.0.yaml -n external-dns --version 1.20.0
 ```
 
-## Deploy ArgoCD
+### 6. Argo CD
 
-Docs: [https://artifacthub.io/packages/helm/argo/argo-cd](https://artifacthub.io/packages/helm/argo/argo-cd) 
-
-**Add ArgoCD repo**
+Docs: [Argo CD Helm chart](https://artifacthub.io/packages/helm/argo/argo-cd)
 
 ```bash
 helm repo add argo https://argoproj.github.io/argo-helm
-```
-
-Get the values:
-
-```bash
 helm show values argo/argo-cd --version 9.4.0 > argocd-values-9.4.0.yaml
 ```
 
 Modify the values file:
 
-Add this ”`server.insecure: true`”  line explicitly :
+**a) Run the server in insecure mode** (TLS is terminated at the load balancer, so Argo CD runs plain HTTP internally):
 
-If TLS is terminated at the **Ingress / Load Balancer**, ArgoCD should run in **insecure mode** internally.
-
-```bash
+```yaml
   params:
-    # -- Create the argocd-cmd-params-cm configmap
-    # If false, it is expected the configmap will be created by something else.
     create: true
     server.insecure: true
 ```
 
-Add this `kustomize.buildOptions: "--enable-helm` line in the `config` section as Kustomize is require to combine the helm values and manifest file.
+**b) Enable Helm inside Kustomize.** Helm support in Kustomize is considered an unsafe plugin and is disabled by default, so it must be explicitly allowed:
 
-- Helm support inside Kustomize is considered an **unsafe plugin**, so it is disabled.
-- You must explicitly allow it.
-
-```bash
+```yaml
 configs:
-  # General Argo CD configuration. Any values you put under `.configs.cm` are passed to argocd-cm ConfigMap.
-  ## Ref: https://github.com/argoproj/argo-cd/blob/master/docs/operator-manual/argocd-cm.yaml
   cm:
-    # -- Create the argocd-cm configmap for [declarative setup]
     create: true
     kustomize.buildOptions: "--enable-helm"
-
 ```
 
-```bash
+**c) Expose Argo CD through the Gateway API HTTPRoute:**
+
+```yaml
   httproute:
-    # -- Enable HTTPRoute resource for Argo CD server (Gateway API)
     enabled: true
-    # -- Additional HTTPRoute labels
     labels: {}
-    # -- Additional HTTPRoute annotations
     annotations: {}
-    # -- Gateway API parentRefs for the HTTPRoute
-    ## Must reference an existing Gateway
-    # @default -- `[]` (See [values.yaml])
     parentRefs:
       - name: app-alb-gateway
         namespace: default
         sectionName: https
-    # -- List of hostnames for the HTTPRoute
-    # @default -- `[]` (See [values.yaml])
     hostnames:
-      - argocd.devopsdock.site
-    # -- HTTPRoute rules configuration
-    # @default -- `[]` (See [values.yaml])
+      - argocd.<your-domain>
     rules:
       - matches:
           - path:
@@ -869,11 +516,9 @@ Install the chart:
 helm install argo-cd argo/argo-cd -n argocd -f argocd-values-9.4.0.yaml --version 9.4.0 --create-namespace
 ```
 
-Add Target group config:
+Add the target group configuration – `target-grp-config.yaml`:
 
-`target-grp-config.yaml`
-
-```bash
+```yaml
 apiVersion: gateway.k8s.aws/v1beta1
 kind: TargetGroupConfiguration
 metadata:
@@ -886,194 +531,55 @@ spec:
     targetType: ip
 ```
 
-Apply:
-
 ```bash
-kubectl apply -f target-grp-config.yaml 
+kubectl apply -f target-grp-config.yaml
 ```
 
+> **Why `TargetGroupConfiguration`?**
+> It is only needed for the **AWS Load Balancer Controller** (Gateway API backed by ALB/NLB). AWS ELBs distinguish between `instance` targets (EC2 nodes) and `ip` targets (pod IPs directly), and Kubernetes has no native way to express that, so AWS introduced this CRD. In-cluster proxy gateways (kgateway, Istio, Kong, NGINX Gateway) don't need it.
+> Rule of thumb: if traffic goes directly from an AWS ELB to pods (GatewayClass `aws-alb-gateway-class`, Service type `ClusterIP`, target type `ip`), `TargetGroupConfiguration` is mandatory.
 
-> [!NOTE]
->`TargetGroupConfiguration` is **ONLY** for:
->
->- ✅ **AWS Load Balancer Controller (LBC)**
->- ✅ **Gateway API backed by AWS ALB / NLB**
->
->It is **NOT required** (and not even used) by:
->
->- ❌ **kgateway**
->- ❌ Istio
->- ❌ Kong
->- ❌ NGINX Gateway / Ingress
->- ❌ Any non-AWS controller
->
->So when you tried **kgateway**, it worked without this — that’s expected.
->
->---
->
->## Why this resource exists (AWS-specific problem)
->
->AWS ALB / NLB have a **hard distinction** that most gateways don’t:
->
->| Target type | Meaning |
->| --- | --- |
->| `instance` | Send traffic to **EC2 nodes** |
->| `ip` | Send traffic directly to **pod IPs** |
->
->Kubernetes **does not express this concept natively**.
->
->So AWS had to invent a CRD to answer:
->
->> “How should I register targets for this Service?”
->> 
->
->That CRD is:
->
->```yaml
->TargetGroupConfiguration
->```
->
->Other gateways don’t have this problem because they:
->
->- proxy inside the cluster
->- don’t integrate directly with AWS ELB target groups
->
->---
->
->## Controller comparison (this is the key insight)
->
->| Gateway / Controller | Needs TargetGroupConfiguration? | Why |
->| --- | --- | --- |
->| **AWS LBC (ALB / NLB)** | ✅ YES | ELB target type must be explicit |
->| **AWS Gateway API (ALB)** | ✅ YES | Same controller underneath |
->| **kgateway** | ❌ NO | Pure in-cluster proxy |
->| **Istio Gateway** | ❌ NO | Envoy → Service |
->| **NGINX Gateway** | ❌ NO | NGINX → Service |
->| **Kong Gateway** | ❌ NO | Kong → Service |
->
->So what you observed is **exactly correct behavior**.
->
->---
->
->## Why it only shows up with Gateway API (and not always with Ingress)
->
->This trips people up:
->
->- With **Ingress**, AWS LBC often **auto-infers** target type
->- With **Gateway API**, AWS requires **explicit config**
->
->From AWS docs (paraphrased):
->
->> Gateway API requires explicit target group configuration for deterministic behavior.
->> 
->
->That’s why your Gateway worked *only after* adding `TargetGroupConfiguration`.
->
->---
->
->## Mental model to keep forever
->
->> If traffic goes directly from AWS ELB → Kubernetes pods, you need TargetGroupConfiguration.
->> 
->- AWS ELB → Pod IPs → ✅ required
->- Pod → Pod (proxy) → ❌ not required
->
->---
->
->## Practical rule you can use
->
->When using:
->
->- **GatewayClass = `aws-alb-gateway-class`**
->- **Service type = ClusterIP**
->- **Target type = ip**
->
->👉 **TargetGroupConfiguration is mandatory**
->
->For anything else → ignore it.
+Access Argo CD in the browser at `https://argocd.<your-domain>`.
 
-
-
-Access directly in the browser:
+Get the auto-generated admin password (user: `admin`):
 
 ```bash
-https://argocd.devopsdock.site
-```
-
-To get the password and user:
-
-```bash
-#get auto generated password
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 ```
 
-```bash
-user:admin
-```
+You can change the password from **Login → User info → Update Password**.
 
-You can change the auto generated password.
+### 7. CI with GitHub Actions
 
-Login → User info → Update Password 
+Initially, the Helm chart was structured as a single monolithic repository, without separation for individual microservices. To enable an efficient CI/CD workflow, the official Docker images for each service were pulled and stored in GitHub Container Registry (GHCR), the Helm templates were updated to reference these images, and the chart was packaged and pushed to GHCR as well. (See the [FAQs](#faqs) for the commands.)
 
-```bash
-Argocd@xxx #Demo password
-```
-
-## Now Lets set up the CI part in Github Action.
-
-Initially, the Helm chart was structured as a single monolithic repository, without separation for individual microservices. To improve modularity and enable an efficient CI/CD workflow, I pulled the official Docker images for each service and stored them in GitHub Container Registry. I then updated the Helm templates to reference these images, packaged the chart, and pushed it to GitHub Container Registry. This setup ensures a streamlined and scalable CI/CD process tailored to our microservices architecture.
-
-Once you have the images in the github packages, connect them to the repository.
-
-So that it shows up and linked to your repo like this.
+Once the images are in GitHub Packages, connect them to the repository so they show up linked to it:
 
 ![image-magik.png](docs/images/image-magik.png)
 
-Go to the image →Package Setting, and give permission to the repo to run action.
-
-When you gave **Write access** under:
-
-👉 **Package**
-
-You allowed:
-
-> “This repository is allowed to push/pull this package.”
-> 
-
-Think of it as:
-
-👉 **Door access to the building**
-
-Without it → push fails even if workflow has write permission.
+Go to the image → **Package settings**, and give the repository permission to run actions. Granting **Write access** under *Package* allows the repository to push/pull that package. It is the "door access to the building": without it, a push fails even if the workflow itself has write permission.
 
 ![image.png](docs/images/image.png)
 
-Add the repository
+Add the repository:
 
 ![image.png](docs/images/image%201.png)
 
-Give the package write permission.
+Give the package write permission:
 
 ![image.png](docs/images/image%202.png)
 
-As the permission is set now. We will add the workflow files now.
-
-Create a directory at the root level of the repo.
+Now add the workflow files. Create the directory at the root of the repo:
 
 ```bash
 mkdir -p .github/workflows
 ```
 
-Inside the `workflows` create two config file.
+> **Note:** These files already exist in this repo. Modify them as needed.
 
+**`.github/workflows/microservice-ci.yaml`** – reusable workflow that builds, scans and pushes one service:
 
-> [!NOTE]
->These files are already available in the github repo. You just need to modify them and use them as per your need.
-
-
-**`microservice-ci.yaml`**
-
-```bash
+```yaml
 name: Microservice CI
 
 on:
@@ -1090,21 +596,15 @@ jobs:
       IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/microservices-demo/${{ inputs.service }}:sha-${{ github.sha }}
 
     steps:
-      # -------------------
       # Checkout source
-      # -------------------
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # -------------------
       # Docker Buildx (cache support)
-      # -------------------
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # -------------------
       # Login to GHCR
-      # -------------------
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -1112,9 +612,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # -------------------
       # Build Docker image (cached)
-      # -------------------
       - name: Build Image
         run: |
           docker build \
@@ -1123,9 +621,7 @@ jobs:
             -t $IMAGE_NAME \
             ./src/${{ inputs.service }}
 
-      # -------------------
-      # Security Scan (before push)
-      # -------------------
+      # Security scan (before push)
       - name: Run Trivy Scan
         uses: aquasecurity/trivy-action@0.20.0
         with:
@@ -1135,31 +631,17 @@ jobs:
           exit-code: 0
           vuln-type: os,library
 
-      # -------------------
-      # Push image (only if scan passes)
-      # -------------------
+      # Push image
       - name: Push Image
         run: |
           docker push $IMAGE_NAME
 ```
 
-> [!TIP]
->
->### In the trivy scan part:
->
->The exit-code is set to 0 intentionally just to pass the build. But its recommended to set to it 1. so that -
->
->- If ANY HIGH or CRITICAL vulnerability is found → **fail the pipeline immediately.**
->- This is actually **best practice for financial / security-heavy companies.**
+> **Tip – Trivy `exit-code`:** it is set to `0` intentionally so the build passes. Setting it to `1` is recommended for real environments: any HIGH or CRITICAL vulnerability then fails the pipeline immediately (best practice for security-heavy workloads). You get the scan report either way.
 
-> [!NOTE] 
->You will get the scan report whether its set to 0 or 1.
+**`.github/workflows/ci-trigger.yaml`** – detects changed services and calls the reusable workflow per service:
 
-
-
-**`ci-trigger.yaml`**
-
-```bash
+```yaml
 name: Microservices Trigger CI
 
 on:
@@ -1173,9 +655,7 @@ permissions:
   packages: write
 
 jobs:
-  # -------------------------------
   # Job 1: Detect changed services
-  # -------------------------------
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -1199,9 +679,7 @@ jobs:
           echo "Detected services: $SERVICES"
           echo "services=$SERVICES" >> $GITHUB_OUTPUT
 
-  # --------------------------------------------------
   # Job 2: Call reusable workflow (matrix per service)
-  # --------------------------------------------------
   build-and-push:
     needs: detect-changes
     if: needs.detect-changes.outputs.services != '[]'
@@ -1211,7 +689,6 @@ jobs:
       matrix:
         service: ${{ fromJson(needs.detect-changes.outputs.services) }}
 
-    # 🚨 IMPORTANT:
     # Reusable workflows are called at JOB level
     uses: ./.github/workflows/microservice-ci.yaml
 
@@ -1219,132 +696,70 @@ jobs:
       service: ${{ matrix.service }}
 ```
 
+> **Note:** The `permissions` block in the workflow controls what the `GITHUB_TOKEN` is allowed to do. It is different from the package permission set in the console in the previous step. Think of it as keycard permissions: even if the door is open, a read-only keycard can't get you in.
 
-> [!NOTE]
->Here the permission in the file is different than the package permission which we set in the console in the previous step.
->
->This controls what the **GITHUB_TOKEN is allowed to do.**
->
->Think of it as:
->
->👉 **Keycard permissions**
->
->Even if the door is open…
->
->If your keycard is read-only → you still cannot enter.
+Push the code and verify CI: change something under `src/` and the action should trigger immediately. Check for the build success message.
 
+### 8. CD with Argo CD
 
-Now push the codes to the repo and try if the CI part is working.
+Argo CD is installed and exposed. The application code, Helm chart and Helm values are already in the repo.
 
-Change something in the microservices `src/` files . Then it should trigger the action immediately.
+To expose the application through the Gateway API, an `HTTPRoute` and a `TargetGroupConfiguration` are needed. They are kept in a separate directory at the repo root: `microservices-extra-kube-manifests/`.
 
-Check the build success message.
+**`microservices-extra-kube-manifests/target-grp.yaml`**
 
-# Now Lets Move to the CD part.
+```yaml
+apiVersion: gateway.k8s.aws/v1beta1
+kind: TargetGroupConfiguration
+metadata:
+  name: app-tg-config
+  namespace: boutique-app
+spec:
+  targetReference:
+    name: frontend
+  defaultConfiguration:
+    targetType: ip
+```
 
-In the earlier step we have installed and exposed the argocd. 
+**`microservices-extra-kube-manifests/HTTProute.yaml`**
 
-Our application code , helm chart and Helm values are already in the repo.
+```yaml
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: http-app-route
+  namespace: boutique-app
+spec:
+  hostnames:
+    - "app.<your-domain>"
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    namespace: default
+    kind: Gateway
+    name: app-alb-gateway
+    sectionName: http
+  - group: gateway.networking.k8s.io
+    namespace: default
+    kind: Gateway
+    name: app-alb-gateway
+    sectionName: https
+  rules:
+  - backendRefs:
+    - name: frontend
+      port: 80
+```
 
-Additionally to expose our application via Gateway API we need `httproute` and `targetgroupconfiguration` files which you can keep in the separate directory in the root.
+Argo CD can deploy multiple sources from one repo inside a single Application by using **Kustomize**, which renders everything as a single manifest. This is a clean pattern because:
 
-In our case i kept in `microservices-extra-kube-manifests/` folder in the root directory.
+- Helm stays reusable (the chart can be published later).
+- Infra-specific resources (`HTTPRoute`, `TargetGroupConfiguration`) stay outside the chart, as they are environment-specific rather than app-specific.
+- Separation of concerns: **Helm = Application**, **extra manifests = Platform / Networking layer**.
 
-- **Create target group configurations for the app `frontend` service.**
-    
-    `microservices-extra-kube-manifests/target-grp.yaml`
-    
-    ```bash
-    #target group configuration
-    apiVersion: gateway.k8s.aws/v1beta1
-    kind: TargetGroupConfiguration
-    metadata:
-      name: app-tg-config
-      namespace: boutique-app
-    spec:
-      targetReference:
-        name: frontend
-      defaultConfiguration:
-        targetType: ip
-    ```
-  
-    
-- **Create the HTTProute for the app so that it will get attached with the gateway and add as a listener in the load balancer.**
-    
-    `microservices-extra-kube-manifests/HTTProute.yaml` 
-    
-    ```bash
-    apiVersion: gateway.networking.k8s.io/v1beta1
-    kind: HTTPRoute
-    metadata:
-      name: http-app-route
-      namespace: boutique-app
-    spec:
-      hostnames:
-        - "app.devopsdock.site"
-      parentRefs:
-      - group: gateway.networking.k8s.io
-        namespace: default
-        kind: Gateway
-        name: app-alb-gateway
-        sectionName: http
-      - group: gateway.networking.k8s.io
-        namespace: default
-        kind: Gateway
-        name: app-alb-gateway
-        sectionName: https
-      rules:
-      - backendRefs:
-        - name: frontend
-          port: 80
-    ```
-    
-- ArgoCD can deploy **multiple sources from one repo** inside a single Application using `Kustomize`.
-- Kustomize render it as a single manifest file.
+> **Important:** You do **not** need to install Kustomize in the cluster. Argo CD has built-in Kustomize support: its repo-server clones the repo, detects `kustomization.yaml`, runs the equivalent of `kustomize build .` and sends the rendered manifests to the Kubernetes API. All of this happens inside the Argo CD pod.
 
-So first Lets create kustomization config and we will attach that as source.
+**`kustomization.yaml`** (repo root) – commit it to Git, do **not** apply it manually:
 
-### Why This Is The Best Pattern
-
-Because you get:
-
-### ✔ Helm remains reusable
-
-You can publish it later.
-
-### ✔ Infra-specific resources stay outside
-
-`HTTPRoute`, `TargetGroupBinding` are **environment-specific**, not app-specific.
-
-### ✔ Cleaner GitOps
-
-Separation of concerns.
-
-Think like this:
-
-👉 Helm = Application
-
-👉 Extra manifests = Platform / Networking layer
-
-> [!IMPORTANT]
->
->**You do NOT need to install Kustomize in the cluster.**
->
->👉 **Argo CD has built-in support for Kustomize.**
->
->It renders Kustomize manifests internally inside the Argo CD repo-server before applying them to the cluster.
->
-
-
-Create a kustomize config file
-
-- Do NOT apply this file manually
-- You commit this file to Git.
-- Then ArgoCD does everything.
-
-**`kustomization.yaml`  (Root Dir)**
-
-```bash
+```yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -1354,35 +769,16 @@ resources:
 
 helmCharts:
   - name: boutique-app
-    repo: oci://ghcr.io/laxmikantagiri/onlineboutique
+    repo: oci://ghcr.io/keshavp07-git/onlineboutique
     version: 0.10.4
     releaseName: boutique-app
     namespace: boutique-app
     valuesFile: helm-chart/values.yaml
 ```
 
-> [!TIP]
->
->## What Actually Happens Behind the Scenes
->
->When you create an Argo CD Application that points to a Kustomize directory:
->
->1. Argo CD repo-server clones your Git repo.
->2. It detects `kustomization.yaml`.
->3. Runs something equivalent to `kustomize build .`
->4. Sends the rendered manifests to the Kubernetes API.
->
->👉 All of this happens **inside the Argo CD pod**, not your cluster nodes.
->
+**Create the Argo CD application** – `argocd/argocd-apps/boutique-app.yaml`:
 
-
-## Create our Argocd App
-
-Create the argo app manifest and place it inside the `argocd/argocd-apps` directory fto organise better.
-
-**`boutique-app.yaml`**
-
-```bash
+```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -1392,7 +788,7 @@ spec:
   project: default
 
   source:
-    repoURL: https://github.com/laxmikantagiri/Production-Grade_GitOps-Driven_Microservices-Demo.git
+    repoURL: https://github.com/keshavp07-git/Production-Grade-GitOps-Driven-Microservices.git
     targetRevision: HEAD
     path: .
 
@@ -1408,148 +804,77 @@ spec:
     - CreateNamespace=true
 ```
 
-Now apply the file:
-
 ```bash
 kubectl apply -f boutique-app.yaml
 ```
 
-Check the ArgoCD UI you should see the app visible there. And all Synced.
+Check the Argo CD UI; the app should be visible and **Synced**:
 
 ![image.png](docs/images/image%203.png)
 
-# Now Lets integrate the CI with CD
+### 9. Argo CD Image Updater (CI + CD integration)
 
-In the current setup the CD (ArgoCD) never takes the updated image form the CI. We need an image updated here.
-
-So whenever CI part is done and the image is pushed to the registry the same image tag should be automatically updated in the helm values file. After that rest ArgoCD can its job.
+At this point CD never picks up the new images produced by CI. For example, the running frontend still uses the older image:
 
 ```bash
-#currently using the the older version of the image "v0.10.4"
 kubectl describe po frontend-7dd5db5f5-xb7g8 -n boutique-app | grep "image"
 
-Normal  Pulled     51m   kubelet            spec.containers{server}: Container image "ghcr.io/laxmikantagiri/microservices-demo/frontend:v0.10.4" already present on machine
+Normal  Pulled  51m  kubelet  spec.containers{server}: Container image "ghcr.io/keshavp07-git/microservices-demo/frontend:v0.10.4" already present on machine
 ```
 
-## Install Argo Image Updater.
+**Argo CD Image Updater** watches the container registry and, when a new tag appears, updates the image tag and lets Argo CD sync it automatically: no `kubectl`, no manual deploy.
 
-**Understand What ArgoCD Image Updater Actually Does**
+Docs: [Artifact Hub](https://artifacthub.io/packages/helm/argo/argocd-image-updater) · [Image Updater docs](https://argocd-image-updater.readthedocs.io/en/stable/)
 
-It watches your container registry and when a new tag appears, it:
-
-- updates the image tag inside Git
-- commits the change
-- ArgoCD syncs automatically
-
-No kubectl. No manual deploy. Pure GitOps.
-
-Docs:
-
-- [https://artifacthub.io/packages/helm/argo/argocd-image-updater](https://artifacthub.io/packages/helm/argo/argocd-image-updater)
-- [https://argocd-image-updater.readthedocs.io/en/stable/](https://argocd-image-updater.readthedocs.io/en/stable/)
-
-Install in the cluster:
-
-Add the repo
+> **Mode used in this project:** `ImageUpdater` CRD with `updateStrategy: newest-build` and **no Git write-back**. Images are updated through the Argo CD API, so Helm values are updated in live state only.
+>
+> ```
+> CI pushes image → GHCR
+>         ↓
+> ImageUpdater detects newest image
+>         ↓
+> ImageUpdater patches Argo CD Application (K8s API)
+>         ↓
+> Argo CD deploys new image
+> ```
 
 ```bash
 helm repo add argo https://argoproj.github.io/argo-helm
 ```
 
-> [!NOTE]
->
->## Argo CD Image Updater – GitHub & Secret Requirements
->
->Argo CD Image Updater can work in **two different modes**:
->
->1. **Live-state update (Argo CD API mode)**
->2. **Git write-back mode (true GitOps)**
->
->The **secrets and permissions required depend on the mode you choose**.
->
->---
->
->## Current Setup: ImageUpdater CRD + `newest-build` (NO Git write-back)
->
->### What we are using ?
->
->- **ImageUpdater CRD**
->- `updateStrategy: newest-build`
->- **No `writeBack.method: git`**
->- Images updated via **Argo CD API**
->- Helm values updated **in live state only**
->
->### Flow
->
->```
->CI pushesimage → GHCR
->        ↓
->ImageUpdater detects newestimage
->        ↓
->ImageUpdater patches Argo CD Application (K8s API)
->        ↓
->Argo CD deploys newimage
->```
+**If your repo/registry is private**, Image Updater needs credentials. Create a classic PAT with `read:packages` (and `write:packages`) and store it as a secret:
 
+```bash
+kubectl create secret docker-registry ghcr-secret \
+  --docker-server=ghcr.io \
+  --docker-username=YOUR_USERNAME \
+  --docker-password=YOUR_GITHUB_PAT \
+  -n argocd
 
+helm show values argo/argocd-image-updater --version 1.0.5 > argo-image-updater-values-1.0.5.yaml
+```
 
-## If Your Repo Is Private
+Add to the `registries` section:
 
-As discussed argocd-image-updater needs permission to your github repo so that it can create update to the value files or push/pull new changes . **(Optional In this Case , Do this if its a private repo)**
-
-- You can use the same PAT which you used for CI, or else create a classic token with the below permission.
-    
-    ```bash
-    read:packages
-    write:pacakges
-    ```
-    
-    Then, create a secret and store the PAT and user name.
-    
-    ```bash
-    kubectl create secret docker-registry ghcr-secret \
-      --docker-server=ghcr.io \
-      --docker-username=YOUR_USERNAME \
-      --docker-password=YOUR_GITHUB_PAT \
-      -n argocd
-    ```
-    
-    Configure ArgoCD to Use That Secret
-    
-    ```bash
-    helm show values argo/argocd-image-updater --version 1.0.5 > argo-image-updater-values-1.0.5.yaml
-    ```
-    
-    Add the below configs in the `registries` section
-    
-    `vi argo-image-updater-values-1.0.5.yaml`
-    
-    ```bash
-    registries:
-        - name: ghcr
-          api_url: https://ghcr.io
-          prefix: ghcr.io
-          credentials: pullsecret:argocd/ghcr-secret
-    ```
-    
-
-Install the chart:
+```yaml
+registries:
+    - name: ghcr
+      api_url: https://ghcr.io
+      prefix: ghcr.io
+      credentials: pullsecret:argocd/ghcr-secret
+```
 
 ```bash
 helm install argocd-image-updater argo/argocd-image-updater -f argo-image-updater-values-1.0.5.yaml -n argocd --version 1.0.5
 ```
 
-</aside>
-
-In our case the repo is public so its not required.
-
-Install the chart:
+**In this project the repo is public**, so credentials are not required:
 
 ```bash
 helm install argocd-image-updater argo/argocd-image-updater -n argocd --version 1.0.5
 ```
 
-Make sure its running:
+Make sure it is running:
 
 ```bash
 kubectl get po -n argocd
@@ -1565,11 +890,9 @@ argo-cd-argocd-server-d5cb45b88-pcxfg                       1/1     Running   0 
 argocd-image-updater-controller-684b4bd5f9-5w6xf            1/1     Running   0          34s
 ```
 
-Add `imageupdater` CR
+Add the `ImageUpdater` CR – `image-updater.yaml`:
 
-`image-updater.yaml`
-
-```bash
+```yaml
 apiVersion: argocd-image-updater.argoproj.io/v1alpha1
 kind: ImageUpdater
 metadata:
@@ -1586,533 +909,208 @@ spec:
 
       images:
         - alias: adservice
-          imageName: ghcr.io/laxmikantagiri/microservices-demo/adservice
+          imageName: ghcr.io/keshavp07-git/microservices-demo/adservice
 
         - alias: cartservice
-          imageName: ghcr.io/laxmikantagiri/microservices-demo/cartservice
+          imageName: ghcr.io/keshavp07-git/microservices-demo/cartservice
 
         - alias: checkoutservice
-          imageName: ghcr.io/laxmikantagiri/microservices-demo/checkoutservice
+          imageName: ghcr.io/keshavp07-git/microservices-demo/checkoutservice
 
         - alias: currencyservice
-          imageName: ghcr.io/laxmikantagiri/microservices-demo/currencyservice
+          imageName: ghcr.io/keshavp07-git/microservices-demo/currencyservice
 
         - alias: emailservice
-          imageName: ghcr.io/laxmikantagiri/microservices-demo/emailservice
+          imageName: ghcr.io/keshavp07-git/microservices-demo/emailservice
 
         - alias: frontend
-          imageName: ghcr.io/laxmikantagiri/microservices-demo/frontend
+          imageName: ghcr.io/keshavp07-git/microservices-demo/frontend
 
         - alias: paymentservice
-          imageName: ghcr.io/laxmikantagiri/microservices-demo/paymentservice
+          imageName: ghcr.io/keshavp07-git/microservices-demo/paymentservice
 
         - alias: productcatalogservice
-          imageName: ghcr.io/laxmikantagiri/microservices-demo/productcatalogservice
+          imageName: ghcr.io/keshavp07-git/microservices-demo/productcatalogservice
 
         - alias: recommendationservice
-          imageName: ghcr.io/laxmikantagiri/microservices-demo/recommendationservice
+          imageName: ghcr.io/keshavp07-git/microservices-demo/recommendationservice
 
         - alias: shippingservice
-          imageName: ghcr.io/laxmikantagiri/microservices-demo/shippingservice
+          imageName: ghcr.io/keshavp07-git/microservices-demo/shippingservice
 
         - alias: loadgenerator
-          imageName: ghcr.io/laxmikantagiri/microservices-demo/loadgenerator
+          imageName: ghcr.io/keshavp07-git/microservices-demo/loadgenerator
 ```
-
-Apply it:
 
 ```bash
 kubectl apply -f image-updater.yaml
-```
-
-Verify:
-
-```bash
 kubectl get imageupdater -n argocd
 
 NAME                     AGE
 boutique-image-updater   13s
 ```
 
-Head to ArgoCD UI , and in separte tab run the CI pipeline or trigger it via chnaging the code you should see updated images automaticaaly picked. in ArgoCD
+Open the Argo CD UI, and in a separate tab run the CI pipeline (or trigger it by changing code). The updated images are picked up automatically in Argo CD:
 
 ![image.png](docs/images/image%204.png)
 
 ![image.png](docs/images/image%205.png)
 
-Access the website `app.devopsdock.site`
+Access the website at `app.<your-domain>`; it should be accessible.
 
-It should be accessible.
+---
 
-# Observability
+## Observability
 
-We generally dont manage the observability stack by Argocd. Because anyone having access to Argocd can modify it.
+The observability stack is generally **not** managed by Argo CD, because anyone with Argo CD access could modify it.
 
-## 1. Monitoring
-
-Create a namespace:
+### 1. Monitoring
 
 ```bash
 kubectl create ns monitoring
 ```
 
-## Setup Slack
+#### Set up Slack alerts
 
-go to [https://api.slack.com/apps](https://api.slack.com/apps)
-
-If you have no slack accounts then this will ask you to setup that first.
-
-Sign in with google
+Go to [api.slack.com/apps](https://api.slack.com/apps). If you have no Slack account, you will be asked to set one up first. Sign in with Google:
 
 ![image.png](docs/images/image%206.png)
 
-Create a workspace
+Create a workspace:
 
 ![image.png](docs/images/image%207.png)
 
 ![image.png](docs/images/image%208.png)
 
-Create a dedicated channel where you want to receive the alerts.
-
-**`#alertmanager`**
+Create a dedicated public channel for alerts, e.g. **`#alertmanager`**:
 
 ![image.png](docs/images/image%209.png)
 
-Keep it public.
-
 ![image.png](docs/images/image%2010.png)
 
-After this is done 
-
-Go to [https://api.slack.com/apps](https://api.slack.com/apps) again.
+Go to [api.slack.com/apps](https://api.slack.com/apps) again and create an app **from scratch**:
 
 ![image.png](docs/images/image%2011.png)
 
-From scartch
-
 ![image.png](docs/images/image%2012.png)
 
-Give name and choose the workspace and create.
+Give it a name, choose the workspace and create:
 
 ![image.png](docs/images/image%2013.png)
 
-Head to **`Incoming Webhook`**
+Open **Incoming Webhooks**:
 
 ![image.png](docs/images/image%2014.png)
 
-Turn it ON
+Turn it ON:
 
 ![image.png](docs/images/image%2015.png)
 
-Scroll down then Click on **`Add New Webhook`**
-
-Select the channel and then allow.
+Scroll down and click **Add New Webhook to Workspace**, select the channel and allow:
 
 ![image.png](docs/images/image%2016.png)
 
-Copy the Webhook and keep it somewhere pasted.
+Copy the webhook URL and keep it safe:
 
 ![image.png](docs/images/image%2017.png)
 
-Don’t expose a **real Slack webhook URL** in your message.
+> **Never expose a real Slack webhook URL** in a repo or message; anyone with it can post to your channel. Store it in a Kubernetes Secret instead of plain text in `values.yaml`, then mount the secret into the pod.
 
-Anyone can now send messages to your Slack channel.
-
-You should:
-
-- Store it in Kubernetes Secret instead of plain text in values.yaml
-- Then mount the secret to that po.
-
-### Create a Kubernetes Secret for Slack Webhook
-
-On your cluster:
+Create the Kubernetes Secret:
 
 ```bash
 kubectl create secret generic alertmanager-slack-webhook \
-  --from-literal=slack-webhook-url="<Webhook FQDN>" \
+  --from-literal=slack-webhook-url="<Webhook URL>" \
   -n monitoring
-```
 
-Verify:
-
-```bash
 kubectl get secret alertmanager-slack-webhook -n monitoring
 ```
 
-### Kube-Prometheus-Stack
-
-Add `kube-prometheus-stack`  repo:
+#### kube-prometheus-stack
 
 ```bash
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+
+helm show values prometheus-community/kube-prometheus-stack --version 81.6.3 > observability/helm-values/kube-prom-stack-81.6.3.yaml
 ```
 
-get the helm values and save it in a file:
+Edit the values file. First, mount the secret in `alertmanagerSpec`:
 
-```bash
-helm show values prometheus-community/kube-prometheus-stack --version 81.6.3 > observability/helm-values/kube-prom-stack-81.6.3.yaml 
-```
-
-Edit in `vi`
-
-Attach the secret in `alertmanagerSpec:` section. So that it will mount to the pod.
-
-```bash
+```yaml
 alertmanager:
   alertmanagerSpec:
-        secrets:
-            - alertmanager-slack-webhook
+    secrets:
+      - alertmanager-slack-webhook
 ```
 
-Go to `alertmanger` section and find its `config` block:
+Then update the Alertmanager `config` block:
 
-```bash
+```yaml
 config:
-    global:
-      resolve_timeout: 5m
-    route:
-      group_by: ['namespace']
-      group_wait: 30s
-      group_interval: 5m
-      repeat_interval: 12h
-      receiver: 'slack-notification'
-      routes:
-      - receiver: 'slack-notification'
-        matchers:
-          - severity = "critical"
-    receivers:
-    - name: 'slack-notification'
-      slack_configs:
-          - api_url_file: /etc/alertmanager/secrets/alertmanager-slack-webhook/slack-webhook-url
-           channel: '#alerts'
-           send_resolved: true
-    templates:
-    - '/etc/alertmanager/config/*.tmpl'
+  global:
+    resolve_timeout: 5m
+  route:
+    group_by: ['namespace']
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 12h
+    receiver: 'slack-notification'
+    routes:
+    - receiver: 'slack-notification'
+      matchers:
+        - severity = "critical"
+  receivers:
+  - name: 'slack-notification'
+    slack_configs:
+      - api_url_file: /etc/alertmanager/secrets/alertmanager-slack-webhook/slack-webhook-url
+        channel: '#alertmanager'
+        send_resolved: true
+  templates:
+  - '/etc/alertmanager/config/*.tmpl'
 ```
 
-> [!TIP]
->
->Let’s break it down clearly 👇
->
->---
->
-># 1. `global`
->
->```yaml
->global:resolve_timeout:5m
->```
->
->- If Alertmanager stops receiving an alert firing signal,
->- It waits **5 minutes**
->- Then marks the alert as **resolved**
->
->So alerts don’t instantly disappear if there’s a short scrape failure.
->
->---
->
-># 2.  `route` (Main Routing Logic)
->
->This is the **core brain** of Alertmanager.
->
->```yaml
->route:group_by: ['namespace']group_wait:30sgroup_interval:5mrepeat_interval:12hreceiver:'slack-notification'
->```
->
->### ✅ `group_by: ['namespace']`
->
->Alerts are grouped by **Kubernetes namespace**.
->
->Meaning:
->
->- If 5 alerts fire in `production`
->- They get grouped into one Slack message (instead of 5 separate messages)
->
->---
->
->### ✅ `group_wait: 30s`
->
->Alertmanager waits **30 seconds** before sending the first notification.
->
->Why?
->
->To collect more alerts and group them.
->
->---
->
->### ✅ `group_interval: 5m`
->
->If new alerts join the same group,
->
->Alertmanager waits **5 minutes** before sending an updated notification.
->
->---
->
->### ✅ `repeat_interval: 12h`
->
->If an alert is still firing,
->
->It will resend the notification every **12 hours**.
->
->Prevents Slack spam.
->
->---
->
->### ✅ `receiver: 'slack-notification'`
->
->Default receiver = Slack
->
->If no sub-route matches → send to Slack.
->
->---
->
-># 3. Sub-route (Severity Based)
->
->```yaml
->routes:-receiver:'slack-notification'matchers:-severity="critical"
->```
->
->This means:
->
->👉 If alert label contains:
->
->```
->severity="critical"
->```
->
->It goes to `slack-notification`.
->
->⚠️ In your case this is redundant because default receiver is already Slack.
->
->In real setups you might see:
->
->- Critical → PagerDuty
->- Warning → Slack
->- Info → Email
->
->---
->
-># 4. Receivers (Where Alerts Go)
->
->```yaml
->receivers:-name:'slack-notification'slack_configs:
->```
->
->Defines the actual notification method.
->
->---
->
->### Slack Config
->
->```yaml
->api_url:'https://hooks.slack.com/services/...'channel:'#alerts'send_resolved:true
->```
->
->- `api_url` → Slack Webhook URL
->- `channel` → Slack channel to post in
->- `send_resolved: true` → Sends message when alert is fixed
->
->So Slack gets:
->
->🔥 Firing alert
->
->✅ Resolved alert
->
->---
->
-># 5. Templates
->
->```yaml
->templates:-'/etc/alertmanager/config/*.tmpl'
->```
->
->This allows custom message formatting.
->
->You can define:
->
->- Custom Slack message layout
->- Add emojis
->- Show pod name, namespace, cluster name
->- Format nicely for production
->
->---
->
-
-> [!TIP]
->**Prometheus alert rules set the severity label.**
->
->Alertmanager only reads it and routes based on it.
->
->Alertmanager does NOT decide what is critical.
->
->---
->
-># How It Actually Works (End-to-End Flow)
->
->### 1. Application exposes metrics
->
->Example:
->
->```
->http_requests_total
->pod_memory_usage_bytes
->up
->```
->
->---
->
->### 2. Prometheus scrapes those metrics
->
->From:
->
->- Pods
->- Services
->- Nodes
->- Kubernetes API
->- etc.
->
->---
->
->### 3. Alert Rules Define When Something Is Critical
->
->Inside kube-prometheus-stack, there are many alert rules like:
->
->```yaml
->-alert:PodCrashLoopingexpr:kube_pod_container_status_restarts_total>5for:5mlabels:severity:criticalannotations:description:Podisrestartingfrequently
->```
->
->🚨 THIS is where `severity="critical"` is defined.
->
->Prometheus says:
->
->"If this condition is true → create an alert
->
->and attach label `severity=critical`"
->
->---
->
->### 4. Prometheus Sends Alert to Alertmanager
->
->When the condition becomes true:
->
->```json
->{"alertname":"PodCrashLooping","severity":"critical","namespace":"production"}
->```
->
->Prometheus pushes this to Alertmanager.
->
->---
->
->### 5. Alertmanager Routes Based on Labels
->
->Now your config says:
->
->```yaml
->matchers:-severity="critical"
->```
->
->So Alertmanager checks:
->
->IF severity == critical
->
->→ send to slack-notification
->
->---
->
-># Example Real Scenario
->
->Imagine:
->
->```
->kube_node_status_condition{condition="Ready",status="true"} ==0
->```
->
->If a node goes NotReady → rule fires:
->
->```yaml
->labels:severity:critical
->```
->
->Alertmanager sees:
->
->```
->severity="critical"
->```
->
->Matches your route → sends to Slack 
->
->---
->
-># So Who Decides Critical?
->
->Not:
->
->- App
->- Service
->- Kubernetes
->
->But:
->
->✔ Prometheus alert rule labels
->
->---
->
-># In kube-prometheus-stack
->
->Most default rules already include severity labels like:
->
->- critical
->- warning
->- info
->
->You can check them:
->
->```bash
->kubectl get prometheusrules -n monitoring
->```
->
->Or:
->
->```bash
->kubectl describe prometheusrule <rule-name> -n monitoring
->```
->
-
+> **How the config works**
+>
+> - `resolve_timeout: 5m` – if Alertmanager stops receiving an alert's firing signal, it waits 5 minutes before marking it resolved.
+> - `group_by: ['namespace']` – alerts are grouped by namespace, so 5 alerts in one namespace become one Slack message.
+> - `group_wait: 30s` – wait before the first notification to collect more alerts into the group.
+> - `group_interval: 5m` – wait before sending an update when new alerts join an existing group.
+> - `repeat_interval: 12h` – re-notify every 12 hours if an alert keeps firing.
+> - `receiver` – the default receiver; used when no sub-route matches.
+> - Sub-route on `severity="critical"` is redundant here (default is also Slack), but in real setups critical alerts might go to PagerDuty, warnings to Slack, info to email.
+> - `send_resolved: true` – Slack gets both the 🔥 firing and ✅ resolved messages.
+> - `templates` – optional custom Slack message formatting.
+>
+> **Who decides what is "critical"?** Prometheus alert rules set the `severity` label (e.g. `severity: critical`); Alertmanager only reads it and routes on it. Most default rules in kube-prometheus-stack already carry `critical`/`warning`/`info` labels. Inspect them with `kubectl get prometheusrules -n monitoring` and `kubectl describe prometheusrule <rule-name> -n monitoring`.
 
 Install:
 
 ```bash
-helm upgrade -i kube-prometheus-stack prometheus-community/kube-prometheus-stack --version 81.6.3 -f helm-values/kube-prom-stack-81.6.3.yaml -n monitoring
+helm upgrade -i kube-prometheus-stack prometheus-community/kube-prometheus-stack --version 81.6.3 -f observability/helm-values/kube-prom-stack-81.6.3.yaml -n monitoring
 ```
 
-Check if all the pods are running:
+Check pods and services:
 
 ```bash
 kubectl get po -n monitoring
-```
-
-Check the Services:
-
-```bash
 kubectl get svc -n monitoring
 ```
 
-You should see the Alert Firing messages and Integration messege on slack.
+You should see the alert firing messages and integration message in Slack:
 
 ![image.png](docs/images/image%2018.png)
 
-You sill see both the resolved and firing alerts as we have set `resolved=true`
+Because `send_resolved: true` is set, you will see both resolved and firing alerts:
 
 ![image.png](docs/images/image%2019.png)
 
-### Now Lets Expose the **`Grafana`** and **`Prometheus`** and access the UI of them
+#### Expose Grafana and Prometheus
 
-The helm chart doesn’t include the HTTProute and and the targetconfiguration in its template . So we will add them by writing the manifest file and manage externally.
+The Helm chart doesn't include an `HTTPRoute` or `TargetGroupConfiguration`, so they are written as manifests in the `observability` directory and managed externally.
 
-Create a file in the `observability` directory
+**`observability/HTTProute-grafana.yaml`**
 
-**`HTTProute-grafana.yaml`**
-
-```bash
+```yaml
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: HTTPRoute
 metadata:
@@ -2120,7 +1118,7 @@ metadata:
   namespace: monitoring
 spec:
   hostnames:
-    - "grafana.devopsdock.site"
+    - "grafana.<your-domain>"
   parentRefs:
   - group: gateway.networking.k8s.io
     namespace: default
@@ -2138,11 +1136,9 @@ spec:
       port: 80
 ```
 
-Use the service name and port in the backend refs.
+**`observability/target-grp-grafana.yaml`**
 
-**`target-grp-grafana.yaml`**
-
-```bash
+```yaml
 apiVersion: gateway.k8s.aws/v1beta1
 kind: TargetGroupConfiguration
 metadata:
@@ -2150,26 +1146,21 @@ metadata:
   namespace: monitoring
 spec:
   targetReference:
-    name: kube-prometheus-stack-grafana 
+    name: kube-prometheus-stack-grafana
   defaultConfiguration:
     targetType: ip
-
 ```
-
-Apply both the files
 
 ```bash
 kubectl apply -f HTTProute-grafana.yaml
 kubectl apply -f target-grp-grafana.yaml
 ```
 
-Wait for few momments, Sometimes it takes a bit time to update.
-
-Then access it in your browser.
+Wait a few moments (it can take a bit to update), then open it in your browser:
 
 ![image.png](docs/images/image%2020.png)
 
-Get Grafana 'admin' user password by running:
+Get the Grafana `admin` password:
 
 ```bash
 kubectl --namespace monitoring get secrets kube-prometheus-stack-grafana -o jsonpath="{.data.admin-password}" | base64 -d ; echo
@@ -2177,25 +1168,23 @@ kubectl --namespace monitoring get secrets kube-prometheus-stack-grafana -o json
 
 ![image.png](docs/images/image%2021.png)
 
-You can see all the available metrices in the “Drilldown” section
+All available metrics are visible in the **Drilldown** section:
 
 ![image.png](docs/images/image%2022.png)
 
-Explore the precreated Dashboards
+Explore the pre-created dashboards:
 
 ![image.png](docs/images/image%2023.png)
 
-Check the graph pod and node wise
+Check the graphs pod-wise and node-wise:
 
 ![image.png](docs/images/image%2024.png)
 
-Now similarly lets expose the `Prometheus`:
+Now expose **Prometheus** the same way.
 
-create another set of httproute and targetgroupconfiguration for preometheus.
+**`observability/HTTProute-prometheus.yaml`**
 
-**`HTTProute-prometheus.yaml`**
-
-```bash
+```yaml
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: HTTPRoute
 metadata:
@@ -2203,7 +1192,7 @@ metadata:
   namespace: monitoring
 spec:
   hostnames:
-    - "prometheus.devopsdock.site"
+    - "prometheus.<your-domain>"
   parentRefs:
   - group: gateway.networking.k8s.io
     namespace: default
@@ -2221,9 +1210,9 @@ spec:
       port: 9090
 ```
 
-**`target-grp-prometheus.yaml`**
+**`observability/target-grp-prometheus.yaml`**
 
-```bash
+```yaml
 apiVersion: gateway.k8s.aws/v1beta1
 kind: TargetGroupConfiguration
 metadata:
@@ -2231,12 +1220,10 @@ metadata:
   namespace: monitoring
 spec:
   targetReference:
-    name: kube-prometheus-stack-prometheus 
+    name: kube-prometheus-stack-prometheus
   defaultConfiguration:
     targetType: ip
 ```
-
-Now apply both the files:
 
 ```bash
 kubectl apply -f HTTProute-prometheus.yaml
@@ -2246,76 +1233,64 @@ kubectl apply -f target-grp-prometheus.yaml
 Verify:
 
 ```bash
-kubectl  get targetgroupconfiguration -n monitoring
+kubectl get targetgroupconfiguration -n monitoring
 
 NAME                   SERVICE-NAME                       AGE
 grafana-tg-config      kube-prometheus-stack-grafana      32m
 prometheus-tg-config   kube-prometheus-stack-prometheus   44s
 
-```
-
-```bash
 kubectl get httproute -n monitoring
 
-NAME               HOSTNAMES                   AGE
-grafana-route      ["grafana.devopsdock.site"]      30m
-prometheus-route   ["prometheus.devopsdock.site"]   41s
+NAME               HOSTNAMES                          AGE
+grafana-route      ["grafana.<your-domain>"]          30m
+prometheus-route   ["prometheus.<your-domain>"]       41s
 ```
 
-Head to the browser and access it:
+Open Prometheus in the browser:
 
 ![image.png](docs/images/image%2025.png)
 
-Check all the availble metrices
+Check all available metrics:
 
 ![image.png](docs/images/image%2026.png)
 
 ![image.png](docs/images/image%2027.png)
 
-## 2. Logging
+### 2. Logging
 
-- we will use elasticsearch for logsstore, filebeat for log shipping and kibana for the visualization.
+The logging stack uses **Elasticsearch** (log store), **Filebeat** (log shipper) and **Kibana** (visualization), all managed by the ECK operator.
 
-```
-NOTE: We need the EBS csi driver EKS addon for elasticsearch to dynamically provision an EBS volume.
-```
+> **Note:** The **EBS CSI driver** EKS add-on is required so that Elasticsearch can dynamically provision an EBS volume.
 
-You can follow the below steps for EBS csi driver installation:
-
-Add the addon if not added through terraform:
+Add the add-on if it wasn't added through Terraform:
 
 ```bash
 aws eks describe-addon-versions --addon-name aws-ebs-csi-driver
+
+# List all add-ons to verify
+aws eks list-addons --cluster-name <cluster-name>
 ```
 
-List all the addons to verify:
-
-```bash
-aws eks list-addons --cluster-name <cluster name>
-```
-
-
-
-Create an IAM role and attach a policy. AWS maintains an AWS managed policy or you can create your own custom policy. You can create an IAM role and attach the AWS managed policy with the following command. Replace `*my-cluster*` with the name of your cluster. The command deploys an AWS CloudFormation stack that creates an IAM role and attaches the IAM policy to it.
-
-Run:
+Create an IAM role and attach the AWS managed policy (this deploys a CloudFormation stack that creates the role):
 
 ```bash
 eksctl create iamserviceaccount \
-   --cluster my-cluster \
+   --cluster <cluster-name> \
    --namespace kube-system \
    --name ebs-csi-controller-sa \
    --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy \
    --override-existing-serviceaccounts \
    --approve
 ```
-Make sure EBS csi driver is added. 
-Take the role name from the cloudformation template output.
+
+Take the role ARN from the CloudFormation stack output and create the add-on:
+
+```bash
+eksctl create addon --cluster <cluster-name> --name aws-ebs-csi-driver --version latest \
+    --service-account-role-arn arn:aws:iam::<AWS_ACCOUNT_ID>:role/<role-name-from-cloudformation> --force
 ```
-eksctl create addon --cluster terraform-cluster --name aws-ebs-csi-driver --version latest \
-    --service-account-role-arn arn:aws:iam::224075521056:role/eksctl-terraform-cluster-addon-iamserviceacco-Role1-AXN8WDL6k09R --force
-```
-make sure all the pods are running:
+
+Make sure all EBS CSI pods are running:
 
 ```bash
 kubectl get pods -n kube-system | grep ebs
@@ -2324,29 +1299,20 @@ ebs-csi-controller-5b7d5799f-4tqhp             6/6     Running   0          18s
 ebs-csi-controller-5b7d5799f-5tsbr             6/6     Running   0          18s
 ebs-csi-node-99j8w                             3/3     Running   0          26m
 ebs-csi-node-g2q2f                             3/3     Running   0          26m
-
 ```
 
-Create a namespace:
+Create the namespace and install the ECK operator ([docs](https://artifacthub.io/packages/helm/elastic/eck-operator)):
 
 ```bash
 kubectl create ns logging
-```
 
-Install **`eck-operator`:**
-
-Docs: [https://artifacthub.io/packages/helm/elastic/eck-operator](https://artifacthub.io/packages/helm/elastic/eck-operator)
-
-```bash
 helm repo add elastic https://helm.elastic.co
 helm install eck-operator elastic/eck-operator --version 3.3.0 -n logging
 ```
 
-Create a storageclass so that elastic search can dynamically provision volume in AWS.
+Create a StorageClass so Elasticsearch can dynamically provision volumes on AWS – `observability/storageclass.yaml`:
 
- **vi `observability/storageclass.yaml`** 
-
-```
+```yaml
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -2358,95 +1324,57 @@ reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 ```
 
-apply the yaml file.
-
 ```bash
-kubectl apply -f observability/storageclass.yaml 
-```
+kubectl apply -f observability/storageclass.yaml
+kubectl get storageclass
 
-See the storage class, you should see 2 storage classes
-
-one is default another one we just have created and set to default.
-
-```bash
-kubectl  get storageclass
- 
 NAME                PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
 ebs-aws (default)   ebs.csi.aws.com         Delete          WaitForFirstConsumer   false                  6s
-gp2                 kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   false 
+gp2                 kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   false
 ```
 
-### Now Lets install the ECK- Components which the operator will manage:
+#### Elasticsearch
 
-Install **`eck-elasticsearch`:**
-
-Docs: [https://artifacthub.io/packages/helm/elastic/eck-elasticsearch](https://artifacthub.io/packages/helm/elastic/eck-elasticsearch)
-
-Run:
+Docs: [eck-elasticsearch](https://artifacthub.io/packages/helm/elastic/eck-elasticsearch)
 
 ```bash
 helm install eck-elasticsearch elastic/eck-elasticsearch --version 0.18.0 -n logging
-```
 
-Make sure its running:
-
-```bash
 kubectl get po -n logging
 
 NAME                             READY   STATUS    RESTARTS   AGE
 eck-elasticsearch-es-default-0   1/1     Running   0          3m14s
 elastic-operator-0               1/1     Running   0          44m
-```
 
-You can check the CR as well:
-
-```bash
 kubectl get elasticsearch -n logging
 ```
 
-Additionally you can check the EBS csi driver has donne its job , its dynamically provisioned a volume and attched to that pod
+Confirm the EBS CSI driver dynamically provisioned and attached a volume:
 
 ```bash
 kubectl get pv
 
-NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                                                       STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE
-pvc-f1441351-e44e-4c1b-a28f-fa9d636b5dfb   1Gi        RWO            Delete           Bound    logging/elasticsearch-data-eck-elasticsearch-es-default-0   ebs-aws        <unset>                          110s
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                                                       STORAGECLASS   AGE
+pvc-f1441351-e44e-4c1b-a28f-fa9d636b5dfb   1Gi        RWO            Delete           Bound    logging/elasticsearch-data-eck-elasticsearch-es-default-0   ebs-aws        110s
 
+kubectl get pvc -n logging
+
+NAME                                                STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+elasticsearch-data-eck-elasticsearch-es-default-0   Bound    pvc-f1441351-e44e-4c1b-a28f-fa9d636b5dfb   1Gi        RWO            ebs-aws        3m39s
 ```
 
-```bash
-kubectl  get pvc -n logging
+#### Filebeat (log shipping)
 
-NAME                                                STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
-elasticsearch-data-eck-elasticsearch-es-default-0   Bound    pvc-f1441351-e44e-4c1b-a28f-fa9d636b5dfb   1Gi        RWO            ebs-aws        <unset>                 3m39s
-
-```
-
-### Install **`eck-beat`** for shipping the log:
-
-We will use Filebeat:
-
-Docs: [https://artifacthub.io/packages/helm/elastic/eck-beats](https://artifacthub.io/packages/helm/elastic/eck-beats)
-
-Run to get the values:
+Docs: [eck-beats](https://artifacthub.io/packages/helm/elastic/eck-beats) · [Beats on ECK](https://www.elastic.co/docs/deploy-manage/deploy/cloud-on-k8s/configuration-beats#k8s-beat-chose-the-deployment-model) · [Beats examples](https://www.elastic.co/docs/deploy-manage/deploy/cloud-on-k8s/configuration-examples-beats)
 
 ```bash
 helm show values elastic/eck-beats --version 0.18.0 > observability/helm-values/eck-beats-0.18.0.yaml
 ```
 
-Edit the file:
+Edit `observability/helm-values/eck-beats-0.18.0.yaml`:
 
-And add the following
-
-Reference from this Doc: [https://www.elastic.co/docs/deploy-manage/deploy/cloud-on-k8s/configuration-beats#k8s-beat-chose-the-deployment-model](https://www.elastic.co/docs/deploy-manage/deploy/cloud-on-k8s/configuration-beats#k8s-beat-chose-the-deployment-model)
-
-https://www.elastic.co/docs/deploy-manage/deploy/cloud-on-k8s/configuration-examples-beats
-
-vi **`observability/helm-values/eck-beats-0.18.0.yaml`**
-
-```bash
+```yaml
 ---
-
 version: 9.3.0
 
 labels: {}
@@ -2482,7 +1410,7 @@ daemonSet:
           - mountPath: /var/log/pods
             name: varlogpods
           - mountPath: /var/lib/docker/containers
-            name: varlibdockercontainers  
+            name: varlibdockercontainers
       volumes:
         - name: varlogcontainers
           hostPath:
@@ -2566,29 +1494,11 @@ clusterRole:
     - watch
 ```
 
-Make sure your values matche to the above config.
-
-
-
-> [!NOTE]
->
->The reference should match to the elasticsearch CR name.
->
->```bash
->elasticsearchRef:
->  name: eck-elasticsearch
->```
-
-
-Install:
+> **Note:** `elasticsearchRef.name` must match the Elasticsearch CR name (`eck-elasticsearch`).
 
 ```bash
-helm upgrade -i eck-beats elastic/eck-beats --version 0.18.0 -f helm-values/eck-beats-0.18.0.yaml -n logging
-```
+helm upgrade -i eck-beats elastic/eck-beats --version 0.18.0 -f observability/helm-values/eck-beats-0.18.0.yaml -n logging
 
-Run:
-
-```bash
 kubectl get po -n logging
 
 NAME                             READY   STATUS    RESTARTS   AGE
@@ -2598,56 +1508,39 @@ eck-beats-beat-filebeat-xbtgn    1/1     Running   0          3m19s
 eck-elasticsearch-es-default-0   1/1     Running   0          57m
 elastic-operator-0               1/1     Running   0          98m
 
-```
-
-Check the CR:
-
-```bash
 kubectl get beats -n logging
 
 NAME        HEALTH   AVAILABLE   EXPECTED   TYPE       VERSION   AGE
 eck-beats   green    3           3          filebeat   9.3.0     24m
-
 ```
 
-Installing **`eck-Kibana`:**
-
-Get the values:
+#### Kibana
 
 ```bash
 helm show values elastic/eck-kibana --version 0.18.0 > observability/helm-values/eck-kibana-0.18.0.yaml
 ```
 
-Edit:
+Edit `observability/helm-values/eck-kibana-0.18.0.yaml`:
 
-vi **`observability/helm-values/eck-kibana-0.18.0.yaml`**
-
-```bash
+```yaml
 elasticsearchRef:
   name: eck-elasticsearch
   namespace: logging
-
 ```
-
-Install:
 
 ```bash
 helm install eck-kibana elastic/eck-kibana --version 0.18.0 -f observability/helm-values/eck-kibana-0.18.0.yaml -n logging
 ```
 
-It takes some time to run the pod and the CR, After 2-3 minutes check 
+It takes 2–3 minutes for the pod and CR to come up:
 
 ```bash
 kubectl get kibana -n logging
 
 NAME         HEALTH   NODES   VERSION   AGE
 eck-kibana   green    1       9.3.0     3m10s
-```
 
-Check pods:
-
-```bash
-kubectl get po  -n logging
+kubectl get po -n logging
 
 NAME                             READY   STATUS    RESTARTS   AGE
 eck-beats-beat-filebeat-lfxcn    1/1     Running   0          7h24m
@@ -2658,11 +1551,23 @@ eck-kibana-kb-649c97899-2xn6p    1/1     Running   0          2m52s
 elastic-operator-0               1/1     Running   0          8h
 ```
 
-Lets create an `httproute` and `targetgroupconfiguration` for kibana so that we can expose it through gatewayAPI
+Expose Kibana through the Gateway API. Take the `backendRefs` / `targetReference` names from the service list:
+
+```bash
+kubectl get svc -n logging
+
+NAME                                 TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
+eck-elasticsearch-es-default         ClusterIP   None             <none>        9200/TCP   8h
+eck-elasticsearch-es-http            ClusterIP   172.20.122.122   <none>        9200/TCP   8h
+eck-elasticsearch-es-internal-http   ClusterIP   172.20.45.237    <none>        9200/TCP   8h
+eck-elasticsearch-es-transport       ClusterIP   None             <none>        9300/TCP   8h
+eck-kibana-kb-http                   ClusterIP   172.20.132.127   <none>        5601/TCP   11m
+elastic-operator-webhook             ClusterIP   172.20.227.48    <none>        443/TCP    9h
+```
 
 **`observability/HTTProute-kibana.yaml`**
 
-```bash
+```yaml
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: HTTPRoute
 metadata:
@@ -2670,7 +1575,7 @@ metadata:
   namespace: logging
 spec:
   hostnames:
-    - "kibana.devopsdock.site"
+    - "kibana.<your-domain>"
   parentRefs:
   - group: gateway.networking.k8s.io
     namespace: default
@@ -2688,28 +1593,9 @@ spec:
       port: 5601
 ```
 
-Take the `backendRefs` in `httproute` and `targetReference` in `targetgroupconfiguration` from the service:
+**`observability/target-grp-kibana.yaml`** (don't forget the health check; docs: [TargetGroupConfiguration](https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/gateway/customization/#customizing-services-target-groups-using-targetgroupconfiguration-crd))
 
-```bash
-kubectl get svc -n logging
-
-NAME                                 TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
-eck-elasticsearch-es-default         ClusterIP   None             <none>        9200/TCP   8h
-eck-elasticsearch-es-http            ClusterIP   172.20.122.122   <none>        9200/TCP   8h
-eck-elasticsearch-es-internal-http   ClusterIP   172.20.45.237    <none>        9200/TCP   8h
-eck-elasticsearch-es-transport       ClusterIP   None             <none>        9300/TCP   8h
-eck-kibana-kb-http                   ClusterIP   172.20.132.127   <none>        5601/TCP   11m
-elastic-operator-webhook             ClusterIP   172.20.227.48    <none>        443/TCP    9h
-
-```
-
-Docs: [https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/gateway/customization/#customizing-services-target-groups-using-targetgroupconfiguration-crd](https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/gateway/customization/#customizing-services-target-groups-using-targetgroupconfiguration-crd)
-
-**`observability/target-grp-kibana.yaml`**
-
-Dont forget to add health check
-
-```bash
+```yaml
 apiVersion: gateway.k8s.aws/v1beta1
 kind: TargetGroupConfiguration
 metadata:
@@ -2717,7 +1603,7 @@ metadata:
   namespace: logging
 spec:
   targetReference:
-    name: eck-kibana-kb-http 
+    name: eck-kibana-kb-http
   defaultConfiguration:
     targetType: ip
     protocol: HTTPS
@@ -2726,184 +1612,135 @@ spec:
       healthCheckPath: /api/status
 ```
 
-Now apply the files:
-
 ```bash
 kubectl apply -f observability/HTTProute-kibana.yaml
-```
-
-```bash
 kubectl apply -f observability/target-grp-kibana.yaml
-```
 
-Verify:
-
-```bash
 kubectl get httproute -n logging
-NAME           HOSTNAMES               AGE
-kibana-route   ["kibana.devopsdock.site"]   74s
-```
+NAME           HOSTNAMES                    AGE
+kibana-route   ["kibana.<your-domain>"]     74s
 
-```bash
 kubectl get targetgroupconfiguration -n logging
 NAME               SERVICE-NAME         AGE
 kibana-tg-config   eck-kibana-kb-http   85s
 ```
 
-Head to the browser and access you kibana UI using the host name “`kibana.dsvault.in`”
+Open Kibana in the browser at `kibana.<your-domain>`:
 
 ![image.png](docs/images/image%2028.png)
 
-The defaukt user is  **`elastic` .** Get you password from the below command
+The default user is `elastic`. Get the password:
 
 ```bash
 kubectl get secret eck-elasticsearch-es-elastic-user -n logging -o go-template='{{.data.elastic | base64decode}}'
 ```
 
-Go to discover section:
+Go to the **Discover** section:
 
 ![image.png](docs/images/image%2029.png)
 
-In search field section search for “`namespace`” and the select `kubernetes.namespace`
-
-Click on that and select your app namepsace 
+In the search field, type `namespace`, select `kubernetes.namespace`, click it and select your app namespace:
 
 ![image.png](docs/images/image%2030.png)
 
-Click on the plus icon to view the logs from the namespace
+Click the plus icon to view logs from that namespace:
 
 ![image.png](docs/images/image%2031.png)
 
-See the logs:
+View the logs:
 
 ![image.png](docs/images/image%2032.png)
 
-Expand it to see the full logs i json or table format:
+Expand an entry to see the full log in JSON or table format:
 
 ![image.png](docs/images/image%2033.png)
 
-Similarly you can check any pod’s logs by adding the right field, You can even filter to by adding multiple labels.
-
-For example i can see the logs for `frontend` app, by adding the field `app`
+Similarly you can check any pod's logs by adding the right field and combining multiple labels. For example, to see the `frontend` app logs, add the field `app`:
 
 ![image.png](docs/images/image%2034.png)
 
 ![image.png](docs/images/image%2035.png)
 
-Now i can only see `frontend` pod’s log in the `boutique-app` namespace
-
-# Scaling & Reliability
-
-We are using the microservices demo (Online Boutique style architecture), and we have a **`loadgenerator`** service.
-
-Goal:
-
-1. Use loadgenerator to generate traffic
-2. Enable Horizontal Pod Autoscaler (HPA)
-3. Observe scaling behavior
-4. Validate reliability
-
-Let’s do this properly, step by step.
+Now only the `frontend` pod's logs in the `boutique-app` namespace are shown.
 
 ---
 
-### What Is Load Generator?
+## Scaling & Reliability
 
-In the Online Boutique demo, `loadgenerator` continuously sends HTTP traffic to the `frontend` service.
-
-So traffic flow:
+The `loadgenerator` service continuously sends HTTP traffic to the `frontend`:
 
 ```
 loadgenerator → frontend → other services
 ```
 
-Scaling will usually be applied to:
+Goals:
 
-- frontend
-- cartservice
-- checkoutservice
-- recommendationservice
+1. Use `loadgenerator` to generate traffic
+2. Enable the Horizontal Pod Autoscaler (HPA)
+3. Observe scaling behavior
+4. Validate reliability
 
----
+Candidates for scaling: `frontend`, `cartservice`, `checkoutservice`, `recommendationservice`.
 
-### STEP 1 — Install metric server using helm
+### Step 1 – Install metrics-server
 
-HPA requires metrics from Kubernetes
-
-Docs: [https://artifacthub.io/packages/helm/metrics-server/metrics-server](https://artifacthub.io/packages/helm/metrics-server/metrics-server)
-
-Run:
+HPA requires metrics from Kubernetes. Docs: [metrics-server](https://artifacthub.io/packages/helm/metrics-server/metrics-server)
 
 ```bash
 helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
-```
-
-Install:
-
-```bash
 helm install metrics-server metrics-server/metrics-server --version 3.13.0 -n kube-system
-```
 
-Check if the pods are running:
-
-```bash
 kubectl get po -n kube-system | grep "metrics-server"
 ```
 
-Confirm that metric server is working by running:
+Confirm it is working:
 
 ```bash
 kubectl top nodes
 
-NAME                         CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)   
-ip-10-0-1-64.ec2.internal    90m          4%       2150Mi          68%         
-ip-10-0-2-253.ec2.internal   44m          2%       2576Mi          82%         
-ip-10-0-3-56.ec2.internal    116m         6%       2322Mi          73% 
+NAME                         CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)
+ip-10-0-1-64.ec2.internal    90m          4%       2150Mi          68%
+ip-10-0-2-253.ec2.internal   44m          2%       2576Mi          82%
+ip-10-0-3-56.ec2.internal    116m         6%       2322Mi          73%
 
 kubectl top pods -n boutique-app
 
-NAME                                     CPU(cores)   MEMORY(bytes)   
-adservice-68f9bcd546-qt5pw               2m           101Mi           
-cartservice-6b848f4d6b-86gns             3m           71Mi            
-checkoutservice-d76f9996b-7fzzt          1m           10Mi            
-currencyservice-5d47fbbcbd-q4fsl         5m           37Mi            
-emailservice-fffd8bb8c-jfnsq             2m           39Mi            
-frontend-57c5fdc47c-v2hls                8m           14Mi            
-loadgenerator-7f56fdb774-bcl4s           3m           76Mi            
-paymentservice-75c7596665-jnz8h          1m           126Mi           
-productcatalogservice-78f985f9cd-fg2ls   4m           9Mi             
-recommendationservice-6685dcbd7d-xwlsz   4m           41Mi            
-redis-cart-8649b96fbb-vw2bw              2m           6Mi             
+NAME                                     CPU(cores)   MEMORY(bytes)
+adservice-68f9bcd546-qt5pw               2m           101Mi
+cartservice-6b848f4d6b-86gns             3m           71Mi
+checkoutservice-d76f9996b-7fzzt          1m           10Mi
+currencyservice-5d47fbbcbd-q4fsl         5m           37Mi
+emailservice-fffd8bb8c-jfnsq             2m           39Mi
+frontend-57c5fdc47c-v2hls                8m           14Mi
+loadgenerator-7f56fdb774-bcl4s           3m           76Mi
+paymentservice-75c7596665-jnz8h          1m           126Mi
+productcatalogservice-78f985f9cd-fg2ls   4m           9Mi
+recommendationservice-6685dcbd7d-xwlsz   4m           41Mi
+redis-cart-8649b96fbb-vw2bw              2m           6Mi
 shippingservice-586996844-jncl4          1m           9Mi
 ```
 
-### STEP 2 — Verify Resource Requests Are Set
+### Step 2 – Verify resource requests are set
 
-HPA needs CPU requests defined.
-
-Check one service:
+HPA needs CPU requests defined:
 
 ```bash
 kubectl get deploy frontend -n boutique-app -o yaml | grep -A10 resources
 ```
 
-output:
-
-```bash
- resources:
-          limits:
-            cpu: 200m
-            memory: 128Mi
-          requests:
-            cpu: 100m
-            memory: 64Mi
+```yaml
+resources:
+  limits:
+    cpu: 200m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 64Mi
 ```
 
-### STEP 3 — Create HPA for Frontend
+### Step 3 – Create the HPA for the frontend
 
-Start simple.
-
-Create `scaling/frontend-hpa.yaml`:
+`scaling/frontend-hpa.yaml`:
 
 ```yaml
 apiVersion: autoscaling/v2
@@ -2927,195 +1764,57 @@ spec:
         averageUtilization: 5
 ```
 
-Intentionally kept the `averageUtilization` to 5. Explained in the later steps.
-
-Apply:
-
 ```bash
 kubectl apply -f frontend-hpa.yaml
-```
-
-Check:
-
-```bash
 kubectl get hpa -n boutique-app
 ```
 
-### STEP 4 — Increase Load (Not required in our case)
+> **Why `averageUtilization: 5`?** For testing, the value was reduced from 50% to 5%. Such a low target means even minimal CPU usage exceeds the threshold, so the HPA scales quickly and it is easy to verify that autoscaling works. This is for **demonstration only**; in production, thresholds are tuned to realistic load patterns.
 
-> [!NOTE]
+### Step 4 – Increasing load in a GitOps environment
+
+If the app were deployed statically with plain manifests, you could raise the `USERS` environment variable on `loadgenerator` with `kubectl edit deploy loadgenerator -n boutique-app`.
+
+**In this project that edit will be overwritten.** The app is deployed via Helm and managed by Argo CD, which continuously reconciles the cluster to match Git, so any `kubectl edit` drift is reverted. That is expected GitOps behavior.
+
+> **Correct process in a GitOps-managed environment:**
 >
-> **If you have deployed through manifests or statiscally deployed the app then this is applicable**
+> 1. Update the configuration (HPA / load generator settings) in the Helm values file.
+> 2. Commit and push to the Git repository.
+> 3. Let Argo CD sync the change to the cluster.
 
-Your loadgenerator is already running:
-
-```
-loadgenerator-7f56fdb774-bcl4s
-```
-
-To increase load:
-
-Edit the deployment:
-
-```bash
-kubectl edit deploy loadgenerator -n boutique-app
-```
-
-Find environment variable:
-
-```
-USERS
-```
-
-Increase it:
-
-```yaml
--name:USERS value:"200"
-```
-
-Save.
-
-This increases concurrent simulated users.
-
-**in our case this WILL be overwritten.**
-
-**Because:**
-
-- **Our application is deployed via Helm**
-- **It is managed by Argo CD**
-- **ArgoCD continuously reconciles cluster state to match Git**
-
-**So if you do:**
-
-```bash
-kubectl edit deploy loadgenerator -n boutique-app
-```
-
-**ArgoCD will detect drift and revert it back to the Helm-defined value.**
-
-**That’s expected behavior in GitOps.**
-
----
-
-### What You Should Do Instead (Correct Way)
-
-We must modify the value in Git — not in the cluster.
-
-> [!IMPORTANT]
->
->
->## HPA Configuration in a GitOps-Managed Environment
->
->Since the application is managed using GitOps (via Argo CD), all configuration changes must follow the Git workflow.
->
->- If the HPA configuration is defined in the Helm values file → ✅ This is the correct approach.
->- If changes are made directly in the cluster using `kubectl edit` → ❌ Argo CD will automatically revert them to match the Git repository.
->
->### Correct Process
->
->1. Update the HPA configuration in the Helm values file.
->2. Commit and push the changes to the Git repository.
->3. Allow Argo CD to sync and apply the updated configuration to the cluster.
->
->---
->
->## Testing HPA Behavior
->
->For testing purposes, the `averageUtilization` was reduced from 50% to 5%.
->
->Setting such a low value ensures:
->
->- Even minimal CPU usage will exceed the threshold.
->- HPA will trigger scaling quickly.
->- It becomes easy to verify that autoscaling is functioning correctly.
->
->This configuration is **only for testing and demonstration purposes**.
->
->In a real production environment:
->
->- CPU thresholds would be carefully tuned.
->- Scaling decisions would be based on realistic load patterns.
->- Extremely low utilization targets like 5% would not be used.
->
->The goal here is simply to validate that the HPA mechanism is working as expected.
->
-
-
-### STEP 5 — Watch Scaling
-
-Open two terminals.
+### Step 5 – Watch scaling
 
 Terminal 1:
 
 ```bash
 kubectl get hpa -n boutique-app -w
-```
 
-You should see:
-
-```bash
-NAME           REFERENCE             TARGETS      MINPODS   MAXPODS   REPLICAS   AGE
-frontend-hpa   Deployment/frontend   cpu: 9%/5%   1         6         1          3m1s
-frontend-hpa   Deployment/frontend   cpu: 8%/5%   1         6         2          3m15s
+NAME           REFERENCE             TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+frontend-hpa   Deployment/frontend   cpu: 9%/5%    1         6         1          3m1s
+frontend-hpa   Deployment/frontend   cpu: 8%/5%    1         6         2          3m15s
 frontend-hpa   Deployment/frontend   cpu: 10%/5%   1         6         2          3m30s
 frontend-hpa   Deployment/frontend   cpu: 5%/5%    1         6         2          3m45s
 frontend-hpa   Deployment/frontend   cpu: 4%/5%    1         6         2          4m
 frontend-hpa   Deployment/frontend   cpu: 5%/5%    1         6         2          4m15s
-
 ```
 
 Terminal 2:
 
 ```bash
 kubectl get pods -n boutique-app -w
-```
 
-You should see:
-
-```
 frontend-57c5fdc47c-v2hls                1/1     Running   0               23h
 frontend-57c5fdc47c-zhmk4                1/1     Running   0               4m50s
 ```
 
-Scaling up automatically.
+The frontend scales up automatically. Validate the CPU trigger with `kubectl top pods -n boutique-app`: if CPU crosses 5% of the requests, replicas increase.
 
----
+**Observe in Kibana** by filtering `kubernetes.deployment.name: "frontend"`; you will see more pods appearing. You can also build a visualization of replica count over time.
 
-### Validate CPU Trigger
+### Step 6 – Add HPAs for other services
 
-Run:
-
-```bash
-kubectl top pods -n boutique-app
-```
-
-If CPU crosses 5% of the requests, replicas increase.
-
-### Observe in Kibana
-
-In Kibana:
-
-Filter:
-
-```
-kubernetes.deployment.name: "frontend"
-```
-
-You’ll see more pods appearing.
-
-You can even create a visualization showing replica count over time.
-
----
-
-### STEP 6 — Add HPA for Other Services
-
-You should also scale:
-
-- cartservice
-- checkoutservice
-- recommendationservice
-
-Same HPA structure, just change `name`.
+Apply the same HPA structure (just change `name`) for `cartservice`, `checkoutservice` and `recommendationservice`:
 
 ![image.png](docs/images/image%2036.png)
 
@@ -3125,55 +1824,41 @@ Same HPA structure, just change `name`.
 
 ---
 
----
+## 🎉 Congratulations!
 
->## 🎉 Congratulations!
->
->If you’ve made it this far and successfully deployed the application — well done!
->
->You’ve just completed a full hands-on implementation. Keep going and keep building 🚀
+If you've made it this far and deployed the application successfully, you've completed a full hands-on GitOps implementation. Keep building 🚀
 
 ---
 
----
+## Cleanup
 
-# CleanUp
-Delete the load balancer and its security groups first in the UI.
-
-then,
-
-Run in the local machine (Where you intially ran terraform):
+1. Delete the load balancer and its security groups first from the AWS console.
+2. Then, on the local machine where Terraform was initially run:
 
 ```bash
 terraform destroy -auto-approve
 ```
+
 ---
----
----
----
-# FAQs
-## How to push the images to GHCR (Github Container Registry) ?
+
+## FAQs
+
 <details>
+<summary><b>How to push the images to GHCR (GitHub Container Registry)?</b></summary>
 
-<summary>Click to get Answer</summary>
-
-Create a PAT clasic token with the below permission.
-
-Give permissions:
+Create a classic PAT with the following permission:
 
 ```
-Packages → Read&Write
+Packages → Read & Write
 ```
 
-If private repo add the below as well:
+If the repo is private, add:
 
 ```
 Contents → Read
 ```
 
-## Docker Login
-
-Useful if you store images there.
+Docker login:
 
 ```bash
 echo <TOKEN> | docker login ghcr.io \
@@ -3181,44 +1866,28 @@ echo <TOKEN> | docker login ghcr.io \
    --password-stdin
 ```
 
-Tag/Retag your image:
+Tag/retag the image:
 
 ```bash
-docker tag us-central1-docker.pkg.dev/google-samples/microservices-demo/adservice:v0.10.4 ghcr.io/laxmikantagiri/microservices-demo/adservice:v0.10.4
+docker tag us-central1-docker.pkg.dev/google-samples/microservices-demo/adservice:v0.10.4 ghcr.io/keshavp07-git/microservices-demo/adservice:v0.10.4
 ```
 
 Push the image:
 
 ```bash
-  docker push ghcr.io/laxmikantagiri/microservices-demo/adservice:v0.10.4 
+docker push ghcr.io/keshavp07-git/microservices-demo/adservice:v0.10.4
 ```
+
 </details>
 
-
-## How to create the helm package and store it in the GHCR ?
-
 <details>
+<summary><b>How to create the Helm package and store it in GHCR?</b></summary>
 
-<summary>Click to get Answer</summary>
+**Step 1 – Create a token**
 
-### Step 1 - Create Token
-Create a PAT clasic token with the below permission.
+Create a classic PAT with `Packages → Read & Write` (and `Contents → Read` for a private repo).
 
-Give permissions:
-
-```
-Packages → Read&Write
-```
-
-If private repo add the below as well:
-
-```
-Contents →Read
-```
-
-### Step 2 — Login via Helm
-
-Run:
+**Step 2 – Log in via Helm**
 
 ```bash
 echo <YOUR_TOKEN> | helm registry login ghcr.io \
@@ -3226,68 +1895,41 @@ echo <YOUR_TOKEN> | helm registry login ghcr.io \
    --password-stdin
 ```
 
-If successful:
+On success you will see `Login Succeeded`. (Optionally, also log in with Docker as shown above.)
 
-```
-Login Succeeded
-```
-
-Done.
-
-### Docker Login Too (Optional)
-
-Useful if you store images there.
-
-```bash
-echo <TOKEN> | docker login ghcr.io \
-   -u USERNAME \
-   --password-stdin
-```
-
-## What Your Chart Path Will Look Like
-
-OCI format:
+**Chart path format (OCI):**
 
 ```
 oci://ghcr.io/<OWNER>/charts/onlineboutique
 ```
 
-Example:
-
-```
-oci://ghcr.io/laxmikanta/charts/onlineboutique
-```
-
-Do :
+**Package the chart:**
 
 ```bash
 helm package .
 ```
 
-You will see the package will get created with `.tgz`  format
+A `.tgz` package is created:
 
 ```bash
-ubuntu@ip-10-0-101-164:~/Production-Grade_GitOps-Driven_Microservices-Demo/helm-chart$ ls
+ubuntu@ip-10-0-101-164:~/Production-Grade-GitOps-Driven-Microservices/helm-chart$ ls
 Chart.yaml  README.md  onlineboutique-0.10.4.tgz  templates  values.yaml
 ```
 
-Push to the repository:
+**Push to the registry:**
 
 ```bash
-helm push onlineboutique-0.10.4.tgz oci://ghcr.io/laxmikantagiri
+helm push onlineboutique-0.10.4.tgz oci://ghcr.io/keshavp07-git
 ```
 
-Now you can directly install the package using the below command
-
-(Make sure its public)
+You can now install the package directly (make sure it is public):
 
 ```bash
-helm install boutique oci://ghcr.io/laxmikantagiri/onlineboutique --version 0.10.4
+helm install boutique oci://ghcr.io/keshavp07-git/onlineboutique --version 0.10.4
 ```
+
 </details>
 
 ---
----
-                                        End
----
----
+
+<p align="center"><b>End</b></p>
