@@ -5,7 +5,7 @@ metadata:
   namespace: boutique-app
 spec:
   hostnames:
-    - "app.devopsdock.site"
+    - "app.devsops.site"
   parentRefs:
   - group: gateway.networking.k8s.io
     namespace: default
