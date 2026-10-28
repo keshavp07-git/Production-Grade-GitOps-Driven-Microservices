@@ -15,8 +15,9 @@ images:
     repository: ghcr.io/keshavp07-git/emailservice
     tag: latest
   frontend:
-    repository: ghcr.io/keshavp07-git/frontend
-    tag: sha256-bbc6e8581a56712e629715bcd4f3d752cd630a18084ad64a9b8f2b9f1bdbf9aa
+  repository: ghcr.io/keshavp07-git/frontend
+  tag: ""
+  digest: sha256:bbc6e8581a56712e629715bcd4f3d752cd630a18084ad64a9b8f2b9f1bdbf9aa
   loadgenerator:
     repository: ghcr.io/keshavp07-git/loadgenerator
     tag: latest
